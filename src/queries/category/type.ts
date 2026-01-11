@@ -1,6 +1,18 @@
 import { z } from 'zod';
 
-export const CategorySchema = z.object({
+// Define the type first to avoid circular reference in the schema
+type CategoryType = {
+  id: number;
+  name: string;
+  description: string | null;
+  parentId: number | null;
+  createdAt: string;
+  updatedAt: string;
+  children?: CategoryType[];
+  subcategories?: CategoryType[];
+};
+
+export const CategorySchema: z.ZodType<CategoryType> = z.object({
   id: z.number(),
   name: z.string(),
   description: z.string().nullable(),

@@ -4,7 +4,6 @@ import { getStoredAuth } from '@/lib/auth-utils';
 import type {
   User,
   UserDetail,
-  UsersResponse,
   UserResponse,
 } from './type';
 import {

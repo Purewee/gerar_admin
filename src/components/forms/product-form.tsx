@@ -353,7 +353,7 @@ export function ProductForm({
                               {/* Child Categories */}
                               {hasChildren && (
                                 <div className="bg-muted/30 divide-y">
-                                  {parentCategory.children.map((childCategory) => (
+                                  {parentCategory.children.map((childCategory: Category) => (
                                     <div 
                                       key={childCategory.id} 
                                       className="flex items-center space-x-3 pl-8 pr-3 py-2.5 hover:bg-accent/30 transition-colors"

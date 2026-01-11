@@ -22,8 +22,6 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { fetchUsersOptions } from '@/queries/user/options';
-import { toast } from 'sonner';
-import type { User } from '@/queries/user/type';
 import type { UserSearchParams } from '@/queries/user/query';
 import { Skeleton } from '@/components/ui/skeleton';
 

@@ -1,19 +1,13 @@
-import type * as z from 'zod';
 import adminFetchAndValidate from '@/lib/admin-fetcher';
-import fetchAndValidate from '@/lib/fetcher';
 import { API_BASE_URL } from '@/lib/api-config';
 import { getStoredAuth } from '@/lib/auth-utils';
 import type {
   CreateProductRequest,
   UpdateProductRequest,
-  ProductResponse,
-  ProductsResponse,
   Product,
 } from './type';
 import {
   ProductResponseSchema,
-  ProductsResponseSchema,
-  ProductSchema,
 } from './type';
 
 export interface ProductSearchParams {

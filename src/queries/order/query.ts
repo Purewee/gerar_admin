@@ -1,5 +1,5 @@
 import adminFetchAndValidate from '@/lib/admin-fetcher';
-import type { OrdersResponse, Order } from './type';
+import type { Order } from './type';
 import { OrdersResponseSchema, OrderSchema } from './type';
 import { z } from 'zod';
 

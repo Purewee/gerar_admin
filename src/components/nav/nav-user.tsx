@@ -30,7 +30,7 @@ export function NavUser({
   const handleLogout = () => {
     logout();
     toast.success('Logged out successfully');
-    navigate({ to: '/login/' });
+    navigate({ to: '/login' });
   };
 
   // Generate initials for avatar fallback

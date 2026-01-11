@@ -7,21 +7,23 @@ export const Route = createFileRoute('/_dashboard')({
     // Check if user is authenticated
     if (!isAuthenticated()) {
       throw redirect({
-        to: '/login/',
-        search: {
+        to: '/login',
+        search: (prev) => ({
+          ...prev,
           redirect: location.href,
-        },
+        }),
       });
     }
 
     // Check if user has ADMIN role
     if (!isAdmin()) {
       throw redirect({
-        to: '/login/',
-        search: {
+        to: '/login',
+        search: (prev) => ({
+          ...prev,
           redirect: location.href,
           error: 'admin_required',
-        },
+        }),
       });
     }
   },
