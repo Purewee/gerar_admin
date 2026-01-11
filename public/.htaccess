@@ -1,10 +1,56 @@
+# DO NOT REMOVE. CLOUDLINUX PASSENGER CONFIGURATION BEGIN
+PassengerEnabled off
+# DO NOT REMOVE. CLOUDLINUX PASSENGER CONFIGURATION END
+
+# php -- BEGIN cPanel-generated handler, do not edit
+<IfModule mime_module>
+  AddHandler application/x-httpd-ea-php81 .php .php8 .phtml
+</IfModule>
+# php -- END cPanel-generated handler, do not edit
+
+# DO NOT REMOVE OR MODIFY. CLOUDLINUX ENV VARS CONFIGURATION BEGIN
+<IfModule Litespeed>
+</IfModule>
+# DO NOT REMOVE OR MODIFY. CLOUDLINUX ENV VARS CONFIGURATION END
+
+# Set MIME types
+<IfModule mod_mime.c>
+  AddType application/javascript .js .mjs
+  AddType text/css .css
+  AddType application/json .json
+  AddType image/svg+xml .svg .svgz
+  AddType image/png .png
+  AddType image/jpeg .jpg .jpeg
+  AddType image/gif .gif
+  AddType image/webp .webp
+  AddType image/x-icon .ico
+  AddType font/woff .woff
+  AddType font/woff2 .woff2
+  AddType font/ttf .ttf
+  AddType application/vnd.ms-fontobject .eot
+</IfModule>
+
 <IfModule mod_rewrite.c>
   RewriteEngine On
   RewriteBase /
-  RewriteRule ^index\.html$ - [L]
-  RewriteCond %{REQUEST_FILENAME} !-f
-  RewriteCond %{REQUEST_FILENAME} !-d
-  RewriteRule . /index.html [L]
+  
+  # Redirect root to dist folder
+  RewriteRule ^$ /dist/ [L]
+  
+  # Skip rewriting for actual files in dist
+  RewriteCond %{REQUEST_FILENAME} -f
+  RewriteRule ^ - [L]
+  
+  # Skip rewriting for actual directories in dist
+  RewriteCond %{REQUEST_FILENAME} -d
+  RewriteRule ^ - [L]
+  
+  # Check if file exists in dist folder
+  RewriteCond %{DOCUMENT_ROOT}/dist/$1 -f
+  RewriteRule ^(.*)$ /dist/$1 [L]
+  
+  # Route everything else to dist/index.html for SPA routing
+  RewriteRule ^ /dist/index.html [L]
 </IfModule>
 
 # Enable compression
@@ -22,8 +68,6 @@
   ExpiresByType image/svg+xml "access plus 1 year"
   ExpiresByType text/css "access plus 1 month"
   ExpiresByType application/javascript "access plus 1 month"
-  ExpiresByType application/pdf "access plus 1 month"
-  ExpiresByType text/x-javascript "access plus 1 month"
   ExpiresByType text/html "access plus 0 seconds"
 </IfModule>
 
