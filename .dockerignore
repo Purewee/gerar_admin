@@ -1,0 +1,23 @@
+# Git
+.git
+.github
+.gitignore
+
+# Docker
+.dockerignore
+Dockerfile
+
+# Node
+node_modules
+npm-debug.log
+
+# Editor
+.idea
+.vscode
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build output
+dist
