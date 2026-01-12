@@ -1,6 +1,6 @@
 import type * as z from 'zod';
 import { API_BASE_URL } from './api-config';
-import { getStoredAuth } from './auth-utils';
+import { getStoredAuth, clearAuth, isTokenExpiredError } from './auth-utils';
 
 interface FetchOptions {
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
@@ -40,9 +40,20 @@ export default async function adminFetchAndValidate<T>(
   const json = await res.json();
 
   if (!res.ok) {
-    throw new Error(
-      json.error?.message || json.message || `Request failed with status ${res.status}`,
-    );
+    const errorMessage = json.error?.message || json.message || `Request failed with status ${res.status}`;
+    
+    // Check if this is a token expiration/invalid token error
+    if (res.status === 401 || isTokenExpiredError(errorMessage) || isTokenExpiredError(json)) {
+      // Clear auth data and redirect to login
+      clearAuth();
+      // Redirect to login page - the router will handle this on next navigation
+      if (typeof window !== 'undefined') {
+        window.location.href = '/login';
+      }
+      throw new Error('Your session has expired. Please log in again.');
+    }
+    
+    throw new Error(errorMessage);
   }
 
   const result = schema.safeParse(json);

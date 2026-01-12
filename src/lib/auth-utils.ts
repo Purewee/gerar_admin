@@ -45,3 +45,37 @@ export function requireAdmin(): { token: string; user: User } {
 
   return { token, user };
 }
+
+/**
+ * Clears authentication data from localStorage.
+ * Can be called from anywhere (not just React components).
+ */
+export function clearAuth(): void {
+  localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(USER_KEY);
+}
+
+/**
+ * Checks if an error indicates token expiration or invalid token.
+ */
+export function isTokenExpiredError(error: unknown): boolean {
+  if (typeof error === 'string') {
+    return (
+      error.toLowerCase().includes('invalid') ||
+      error.toLowerCase().includes('expired') ||
+      error.toLowerCase().includes('token')
+    );
+  }
+  
+  if (error instanceof Error) {
+    const message = error.message.toLowerCase();
+    return (
+      message.includes('invalid') ||
+      message.includes('expired') ||
+      message.includes('token') ||
+      message.includes('unauthorized')
+    );
+  }
+  
+  return false;
+}

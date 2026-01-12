@@ -1,6 +1,6 @@
 import adminFetchAndValidate from '@/lib/admin-fetcher';
 import { API_BASE_URL } from '@/lib/api-config';
-import { getStoredAuth } from '@/lib/auth-utils';
+import { getStoredAuth, clearAuth, isTokenExpiredError } from '@/lib/auth-utils';
 import type {
   User,
   UserDetail,
@@ -60,9 +60,19 @@ export const getUsers = async (params?: UserSearchParams): Promise<{
   const json = await res.json();
 
   if (!res.ok) {
-    throw new Error(
-      json.error?.message || json.message || `Request failed with status ${res.status}`,
-    );
+    const errorMessage = json.error?.message || json.message || `Request failed with status ${res.status}`;
+    
+    // Check if this is a token expiration/invalid token error
+    if (res.status === 401 || (token && (isTokenExpiredError(errorMessage) || isTokenExpiredError(json)))) {
+      // Clear auth data and redirect to login
+      clearAuth();
+      if (typeof window !== 'undefined') {
+        window.location.href = '/login';
+      }
+      throw new Error('Your session has expired. Please log in again.');
+    }
+    
+    throw new Error(errorMessage);
   }
 
   // Validate response if it has the expected structure
