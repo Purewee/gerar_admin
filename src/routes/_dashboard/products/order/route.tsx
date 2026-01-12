@@ -216,25 +216,37 @@ function ProductOrderPage() {
         const currentCategoryIds = product.categories?.map((c) => c.id) || 
                                   (product.categoryId ? [product.categoryId] : []);
         
-        // Ensure the selected category is included
-        const categoryIdsToUpdate = currentCategoryIds.includes(selectedCategoryId)
-          ? currentCategoryIds
-          : [...currentCategoryIds, selectedCategoryId];
+        const hasSelectedCategory = currentCategoryIds.includes(selectedCategoryId);
 
-        // Build categoryOrders as object format (Record<string, number>)
-        // This format might be better handled by the backend
-        const categoryOrders: Record<string, number> = {};
-        categoryIdsToUpdate.forEach((catId) => {
-          categoryOrders[catId.toString()] = catId === selectedCategoryId ? index : 0;
-        });
+        // Option 1: Update orders only (without changing categories)
+        // This is more efficient when just reordering within existing categories
+        if (hasSelectedCategory) {
+          // Product already has the selected category, just update its order
+          const categoryOrders: Record<string, number> = {
+            [selectedCategoryId.toString()]: index,
+          };
 
-        return updateProduct.mutateAsync({
-          id: product.id,
-          data: {
-            categoryIds: categoryIdsToUpdate,
-            categoryOrders: categoryOrders,
-          },
-        });
+          return updateProduct.mutateAsync({
+            id: product.id,
+            data: {
+              categoryOrders: categoryOrders,
+            },
+          });
+        } else {
+          // Option 2: Add category and set its order
+          const categoryIdsToUpdate = [...currentCategoryIds, selectedCategoryId];
+          const categoryOrders: Record<string, number> = {
+            [selectedCategoryId.toString()]: index,
+          };
+
+          return updateProduct.mutateAsync({
+            id: product.id,
+            data: {
+              categoryIds: categoryIdsToUpdate,
+              categoryOrders: categoryOrders,
+            },
+          });
+        }
       });
 
       await Promise.all(updatePromises);
