@@ -111,10 +111,10 @@ export const updateCategory = async (
   updates: UpdateCategoryRequest,
 ): Promise<Category> => {
   const response = await adminFetchAndValidate(
-    `/admin/categories/${id}`,
+    `/admin/categories/${id}/update`,
     CategoryResponseSchema,
     {
-      method: 'PUT',
+      method: 'POST',
       body: updates,
     },
   );
@@ -123,10 +123,10 @@ export const updateCategory = async (
 
 export const deleteCategory = async (id: number): Promise<Category> => {
   const response = await adminFetchAndValidate(
-    `/admin/categories/${id}`,
+    `/admin/categories/${id}/delete`,
     CategoryResponseSchema,
     {
-      method: 'DELETE',
+      method: 'POST',
     },
   );
   return response.data;

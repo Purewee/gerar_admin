@@ -159,10 +159,10 @@ export const updateProduct = async (
   updates: UpdateProductRequest,
 ): Promise<Product> => {
   const response = await adminFetchAndValidate(
-    `/admin/products/${id}`,
+    `/admin/products/${id}/update`,
     ProductResponseSchema,
     {
-      method: 'PUT',
+      method: 'POST',
       body: updates,
     },
   );
@@ -171,10 +171,10 @@ export const updateProduct = async (
 
 export const deleteProduct = async (id: number): Promise<Product> => {
   const response = await adminFetchAndValidate(
-    `/admin/products/${id}`,
+    `/admin/products/${id}/delete`,
     ProductResponseSchema,
     {
-      method: 'DELETE',
+      method: 'POST',
     },
   );
   return response.data;

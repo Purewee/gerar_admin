@@ -26,14 +26,41 @@ export async function apiRequest<T>(
   const config: RequestInit = {
     method,
     headers: requestHeaders,
+    credentials: 'include' as RequestCredentials,
   };
 
   if (body && method !== 'GET') {
     config.body = JSON.stringify(body);
   }
 
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, config);
-  const data = await response.json();
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_URL}${endpoint}`, config);
+  } catch (error) {
+    // Handle network errors and CORS errors
+    if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
+      throw new Error(
+        `CORS Error: Unable to connect to the API server. ` +
+        `Please ensure the API server allows requests from the current origin.`
+      );
+    }
+    throw error;
+  }
+
+  let data;
+  try {
+    data = await response.json();
+  } catch (error) {
+    if (error instanceof SyntaxError) {
+      const text = await response.text().catch(() => 'Unable to read response');
+      throw new Error(
+        `Failed to parse API response as JSON. ` +
+        `Status: ${response.status} ${response.statusText}. ` +
+        `Response: ${text.substring(0, 200)}`
+      );
+    }
+    throw error;
+  }
 
   if (!response.ok) {
     const errorMessage = data.error?.message || data.message || 'Request failed';

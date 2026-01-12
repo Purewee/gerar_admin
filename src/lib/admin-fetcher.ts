@@ -30,14 +30,41 @@ export default async function adminFetchAndValidate<T>(
   const config: RequestInit = {
     method,
     headers: requestHeaders,
+    credentials: 'include' as RequestCredentials,
   };
 
   if (body && method !== 'GET') {
     config.body = JSON.stringify(body);
   }
 
-  const res = await fetch(`${API_BASE_URL}${endpoint}`, config);
-  const json = await res.json();
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE_URL}${endpoint}`, config);
+  } catch (error) {
+    // Handle network errors and CORS errors
+    if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
+      throw new Error(
+        `CORS Error: Unable to connect to the API server. ` +
+        `Please ensure the API server allows requests from the current origin.`
+      );
+    }
+    throw error;
+  }
+
+  let json;
+  try {
+    json = await res.json();
+  } catch (error) {
+    if (error instanceof SyntaxError) {
+      const text = await res.text().catch(() => 'Unable to read response');
+      throw new Error(
+        `Failed to parse API response as JSON. ` +
+        `Status: ${res.status} ${res.statusText}. ` +
+        `Response: ${text.substring(0, 200)}`
+      );
+    }
+    throw error;
+  }
 
   if (!res.ok) {
     const errorMessage = json.error?.message || json.message || `Request failed with status ${res.status}`;

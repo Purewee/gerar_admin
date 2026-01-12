@@ -12,9 +12,23 @@ export const login = async (
       'Content-Type': 'application/json',
     },
     body: JSON.stringify(credentials),
+    credentials: 'include' as RequestCredentials,
   };
 
-  const res = await fetch(url, options);
+  let res: Response;
+  try {
+    res = await fetch(url, options);
+  } catch (error) {
+    // Handle network errors and CORS errors
+    if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
+      throw new Error(
+        `CORS Error: Unable to connect to the API server at ${url}. ` +
+        `Please ensure the API server at api.gerar.mn allows requests from admin.gerar.mn. ` +
+        `The backend needs to include 'Access-Control-Allow-Origin: https://admin.gerar.mn' in its CORS configuration.`
+      );
+    }
+    throw error;
+  }
   
   // Check content type before parsing
   const contentType = res.headers.get('content-type');
