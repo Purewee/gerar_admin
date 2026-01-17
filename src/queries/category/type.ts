@@ -6,6 +6,7 @@ type CategoryType = {
   name: string;
   description: string | null;
   parentId: number | null;
+  order?: number;
   createdAt: string;
   updatedAt: string;
   children?: CategoryType[];
@@ -17,6 +18,7 @@ export const CategorySchema: z.ZodType<CategoryType> = z.object({
   name: z.string(),
   description: z.string().nullable(),
   parentId: z.number().nullable(),
+  order: z.number().optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
   children: z.array(z.lazy(() => CategorySchema)).optional(),
@@ -34,6 +36,7 @@ export const UpdateCategorySchema = z.object({
   name: z.string().optional(),
   description: z.string().nullable().optional(),
   parentId: z.number().nullable().optional(),
+  order: z.number().optional(),
 });
 
 export const CategoryResponseSchema = z.object({

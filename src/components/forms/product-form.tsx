@@ -1,9 +1,9 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
-import { useRef } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Plus, X } from 'lucide-react';
+import { Plus, X, Upload, Loader2 } from 'lucide-react';
 import {
   Form,
   FormControl,
@@ -17,6 +17,9 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import type { Category } from '@/queries/category/type';
 import { CreateProductSchema } from '@/queries/product/type';
+import { uploadFiles, uploadFile, deleteImage } from '@/lib/file-upload';
+import { toast } from 'sonner';
+import { ImageCropDialog } from '@/components/image-crop-dialog';
 
 export type ProductFormValues = z.infer<typeof CreateProductSchema>;
 
@@ -88,6 +91,24 @@ export function ProductForm({
   onSubmit,
   isLoading = false,
 }: ProductFormProps) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const isProcessingFilesRef = useRef(false); // Guard to prevent double uploads
+  const processingFilesSetRef = useRef<Set<string>>(new Set()); // Track files currently being processed by name+size
+  const activeUploadRef = useRef<Promise<void> | null>(null); // Track active upload promise
+  const [uploadingFiles, setUploadingFiles] = useState<Set<number>>(new Set());
+  const [uploadProgress, setUploadProgress] = useState<number>(0);
+  
+  // Track images uploaded in this session (to delete from server if removed)
+  const [uploadedImageUrls, setUploadedImageUrls] = useState<Set<string>>(new Set());
+  
+  // Crop dialog state
+  const [cropDialogOpen, setCropDialogOpen] = useState(false);
+  const [imageToCrop, setImageToCrop] = useState<{ file: File; index: number; url: string } | null>(null);
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  
+  // Get initial images from defaultValues (existing product images)
+  const initialImages = defaultValues?.images || [];
+
   const form = useForm<ProductFormValues>({
     resolver: zodResolver(CreateProductSchema),
     defaultValues: {
@@ -103,9 +124,393 @@ export function ProductForm({
 
   const images = form.watch('images') || [];
 
+  // Cleanup blob URLs on component unmount only
+  useEffect(() => {
+    return () => {
+      // Revoke blob URL from crop dialog if it exists
+      if (imageToCrop?.url) {
+        URL.revokeObjectURL(imageToCrop.url);
+      }
+    };
+  }, [imageToCrop]);
+
+  // Helper function to check if image is square (1:1 aspect ratio)
+  const checkImageAspectRatio = (file: File): Promise<boolean> => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      img.onload = () => {
+        const aspectRatio = img.width / img.height;
+        // Consider it square if aspect ratio is between 0.95 and 1.05 (5% tolerance)
+        const isSquare = aspectRatio >= 0.95 && aspectRatio <= 1.05;
+        URL.revokeObjectURL(url);
+        resolve(isSquare);
+      };
+      img.onerror = () => {
+        URL.revokeObjectURL(url);
+        resolve(true); // If we can't load it, assume it's square and let it upload normally
+      };
+      img.src = url;
+    });
+  };
+
+  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    // CRITICAL: Prevent processing if already in progress - check FIRST
+    if (isProcessingFilesRef.current || activeUploadRef.current) {
+      event.target.value = '';
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+        fileInputRef.current.disabled = true; // Disable input
+        // Re-enable after a short delay
+        setTimeout(() => {
+          if (fileInputRef.current) {
+            fileInputRef.current.disabled = false;
+          }
+        }, 100);
+      }
+      return;
+    }
+
+    const files = event.target.files;
+    if (!files || files.length === 0) {
+      // Reset file input to allow selecting the same file again
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+      return;
+    }
+
+    // Store files immediately before any async operations
+    const fileArray = Array.from(files);
+    
+    // Set flag IMMEDIATELY (synchronously) to prevent concurrent calls
+    // The processingFilesSet will be managed in uploadFilesDirectly
+    isProcessingFilesRef.current = true;
+    
+    // Disable file input to prevent multiple triggers
+    if (fileInputRef.current) {
+      fileInputRef.current.disabled = true;
+    }
+    
+    // Reset file input immediately to prevent onChange from firing again
+    // CRITICAL: Do this BEFORE any async operations
+    const inputElement = event.target;
+    inputElement.value = '';
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+
+    // Process files asynchronously - don't await, let it run in background
+    // This prevents the function from blocking and allows the guard to work
+    (async () => {
+      try {
+        const currentImages = form.getValues('images') || [];
+        const startIndex = currentImages.length;
+
+        // Check each file to see if it needs cropping
+        const filesToProcess: Array<{ file: File; needsCrop: boolean; index: number }> = [];
+        
+        for (let i = 0; i < fileArray.length; i++) {
+          const file = fileArray[i];
+          const isSquare = await checkImageAspectRatio(file);
+          filesToProcess.push({ file, needsCrop: !isSquare, index: startIndex + i });
+        }
+
+        // Separate files that need cropping from those that don't
+        const filesNeedingCrop = filesToProcess.filter(f => f.needsCrop);
+        const filesReadyToUpload = filesToProcess.filter(f => !f.needsCrop).map(f => f.file);
+
+        // If there are files that need cropping, show crop dialog for the first one
+        if (filesNeedingCrop.length > 0) {
+          const firstFileToCrop = filesNeedingCrop[0];
+          const url = URL.createObjectURL(firstFileToCrop.file);
+          setImageToCrop({
+            file: firstFileToCrop.file,
+            index: firstFileToCrop.index,
+            url,
+          });
+          // Store remaining files for later processing
+          setPendingFiles([
+            ...filesNeedingCrop.slice(1).map(f => f.file),
+            ...filesReadyToUpload,
+          ]);
+          setCropDialogOpen(true);
+        } else {
+          // All files are square, upload them directly
+          // uploadFilesDirectly will add to processingFilesSet and handle the guard
+          await uploadFilesDirectly(filesReadyToUpload, startIndex, currentImages, true);
+        }
+      } catch (error) {
+        // Handle any unexpected errors
+        console.error('Error processing files:', error);
+        isProcessingFilesRef.current = false;
+        activeUploadRef.current = null;
+        // Don't delete from processingFilesSet here - it wasn't added yet
+        // Re-enable file input on error
+        if (fileInputRef.current) {
+          fileInputRef.current.disabled = false;
+        }
+        toast.error('Файл боловсруулахад алдаа гарлаа');
+      }
+    })(); // Execute async function immediately, don't await
+    // Note: File input is already reset above, and processing flag is reset in uploadFilesDirectly or handleCropComplete
+  };
+
+  const uploadFilesDirectly = async (
+    files: File[],
+    startIndex: number,
+    currentImages: string[],
+    resetProcessingFlag = false
+  ) => {
+    if (files.length === 0) {
+      if (resetProcessingFlag) {
+        isProcessingFilesRef.current = false;
+        // Clear processing files set
+        processingFilesSetRef.current.clear();
+      }
+      return;
+    }
+
+    // Create unique identifier for this upload batch
+    const fileIdentifiers = files.map(f => `${f.name}-${f.size}-${f.lastModified}`).join('|');
+    
+    // AGGRESSIVE GUARD: Check if these exact files are already being uploaded
+    // This check happens in uploadFilesDirectly, but we also check here as a double guard
+    if (processingFilesSetRef.current.has(fileIdentifiers)) {
+      if (resetProcessingFlag) {
+        isProcessingFilesRef.current = false;
+        activeUploadRef.current = null;
+      }
+      return;
+    }
+    
+    // AGGRESSIVE GUARD: Check if upload is already in progress
+    if (activeUploadRef.current) {
+      try {
+        await activeUploadRef.current;
+      } catch (e) {
+        // Ignore errors from previous upload
+      }
+      // Check again after waiting - if files are now processed, skip
+      if (processingFilesSetRef.current.has(fileIdentifiers)) {
+        if (resetProcessingFlag) {
+          isProcessingFilesRef.current = false;
+          activeUploadRef.current = null;
+        }
+        return;
+      }
+    }
+
+    // Mark files as being uploaded IMMEDIATELY
+    processingFilesSetRef.current.add(fileIdentifiers);
+    
+    // Wrap upload in a promise and store it
+    const uploadPromise = (async () => {
+      // Create temporary placeholders for the files being uploaded
+      const tempUrls = files.map((_, index) => `uploading-${startIndex + index}`);
+      form.setValue('images', [...currentImages, ...tempUrls]);
+
+      // Track which indices are being uploaded
+      const uploadingIndices = new Set<number>();
+      files.forEach((_, index) => {
+        uploadingIndices.add(startIndex + index);
+      });
+      setUploadingFiles(uploadingIndices);
+
+      try {
+        // Upload files using the multiple upload endpoint
+        const uploadedUrls = await uploadFiles(
+          files,
+          '/admin/upload/multiple',
+          (progress) => setUploadProgress(progress)
+        );
+
+        // Replace temporary placeholders with actual server URLs (never store blob URLs)
+        const updatedImages = [...currentImages];
+        uploadedUrls.forEach((url, index) => {
+          // Ensure we only store server URLs, not blob URLs
+          if (url && !url.startsWith('blob:')) {
+            updatedImages[startIndex + index] = url;
+            // Track this as an uploaded image
+            setUploadedImageUrls(prev => new Set([...prev, url]));
+          } else {
+            // If somehow we got a blob URL, remove it
+            updatedImages[startIndex + index] = '';
+          }
+        });
+        // Filter out any empty strings or blob URLs
+        const cleanedImages = updatedImages.filter(img => img && !img.startsWith('blob:'));
+        form.setValue('images', cleanedImages.length > 0 ? cleanedImages : undefined);
+        
+        toast.success(`${uploadedUrls.length} зураг амжилттай ачааллаа`);
+      } catch (error) {
+        // Remove failed uploads from the form
+        const updatedImages = currentImages;
+        form.setValue('images', updatedImages);
+        
+        const errorMessage = error instanceof Error ? error.message : 'Зураг ачаалахад алдаа гарлаа';
+        toast.error(errorMessage);
+        // Remove from processing set on error
+        processingFilesSetRef.current.delete(fileIdentifiers);
+        throw error;
+      } finally {
+        setUploadingFiles(new Set());
+        setUploadProgress(0);
+        // Remove from processing set
+        processingFilesSetRef.current.delete(fileIdentifiers);
+        activeUploadRef.current = null; // Clear active upload
+        // Re-enable file input when done
+        if (fileInputRef.current) {
+          fileInputRef.current.disabled = false;
+        }
+        if (resetProcessingFlag) {
+          isProcessingFilesRef.current = false;
+          // Clear processing files set when done
+          processingFilesSetRef.current.clear();
+        }
+      }
+    })();
+    
+    // Store the promise to prevent concurrent uploads
+    activeUploadRef.current = uploadPromise;
+    
+    // Wait for upload to complete
+    try {
+      await uploadPromise;
+    } finally {
+      // Ensure file input is re-enabled even if there's an error
+      if (fileInputRef.current && !isProcessingFilesRef.current) {
+        fileInputRef.current.disabled = false;
+      }
+    }
+  };
+
+  const handleCropComplete = async (croppedImageBlob: Blob) => {
+    if (!imageToCrop) return;
+
+    const currentImages = form.getValues('images') || [];
+    const index = imageToCrop.index;
+    const currentImageToCrop = imageToCrop; // Store reference before state update
+
+    // Create temporary placeholder
+    const tempUrls = [...currentImages];
+    if (tempUrls.length <= index) {
+      // Extend array if needed
+      while (tempUrls.length <= index) {
+        tempUrls.push('');
+      }
+    }
+    tempUrls[index] = `uploading-${index}`;
+    form.setValue('images', tempUrls);
+    setUploadingFiles(new Set([index]));
+
+    try {
+      // Convert blob to File
+      const croppedFile = new File([croppedImageBlob], currentImageToCrop.file.name, {
+        type: 'image/jpeg',
+        lastModified: Date.now(),
+      });
+
+      // Upload the cropped image
+      const uploadedUrl = await uploadFile(croppedFile, '/admin/upload');
+
+      // Update the image at the specific index with server URL (never store blob URLs)
+      const updatedImages = [...currentImages];
+      if (updatedImages.length <= index) {
+        while (updatedImages.length <= index) {
+          updatedImages.push('');
+        }
+      }
+      // Ensure we only store server URLs, not blob URLs
+      if (uploadedUrl && !uploadedUrl.startsWith('blob:')) {
+        updatedImages[index] = uploadedUrl;
+        form.setValue('images', updatedImages);
+        // Track this as an uploaded image
+        setUploadedImageUrls(prev => new Set([...prev, uploadedUrl]));
+      } else {
+        // If somehow we got a blob URL, don't store it
+        console.error('Received blob URL instead of server URL, skipping storage');
+        updatedImages[index] = '';
+        form.setValue('images', updatedImages.filter(img => img && !img.startsWith('blob:')));
+      }
+
+      toast.success('Зураг таслаж амжилттай ачааллаа');
+
+      // Clean up current image URL
+      if (currentImageToCrop.url) {
+        URL.revokeObjectURL(currentImageToCrop.url);
+      }
+
+      // Process next file if there are pending files
+      if (pendingFiles.length > 0) {
+        const nextFile = pendingFiles[0];
+        const remainingFiles = pendingFiles.slice(1);
+        
+        // Check if next file needs cropping
+        const needsCrop = !(await checkImageAspectRatio(nextFile));
+        
+        if (needsCrop) {
+          const url = URL.createObjectURL(nextFile);
+          setImageToCrop({
+            file: nextFile,
+            index: index + 1,
+            url,
+          });
+          setPendingFiles(remainingFiles);
+          // Dialog will stay open for next file
+        } else {
+          // Upload remaining files directly
+          setPendingFiles([]);
+          setCropDialogOpen(false);
+          // Clean up blob URL before clearing
+          if (imageToCrop?.url) {
+            URL.revokeObjectURL(imageToCrop.url);
+          }
+          setImageToCrop(null);
+          await uploadFilesDirectly([nextFile, ...remainingFiles], index + 1, updatedImages, true);
+        }
+      } else {
+        setPendingFiles([]);
+        setCropDialogOpen(false);
+        // Clean up blob URL before clearing
+        if (imageToCrop?.url) {
+          URL.revokeObjectURL(imageToCrop.url);
+        }
+        setImageToCrop(null);
+        isProcessingFilesRef.current = false; // Reset processing flag when all files are processed
+        processingFilesSetRef.current.clear(); // Clear processing files set
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Зураг ачаалахад алдаа гарлаа';
+      toast.error(errorMessage);
+      // Remove failed upload from form
+      const updatedImages = currentImages;
+      form.setValue('images', updatedImages);
+      setCropDialogOpen(false);
+      // Clean up blob URL before clearing
+      if (imageToCrop?.url) {
+        URL.revokeObjectURL(imageToCrop.url);
+      }
+      setImageToCrop(null);
+      isProcessingFilesRef.current = false; // Reset processing flag on error
+      processingFilesSetRef.current.clear(); // Clear processing files set on error
+    } finally {
+      setUploadingFiles(new Set());
+    }
+  };
+
+  const handleCropDialogClose = () => {
+    setCropDialogOpen(false);
+    if (imageToCrop?.url) {
+      URL.revokeObjectURL(imageToCrop.url);
+    }
+    setImageToCrop(null);
+    setPendingFiles([]);
+  };
+
   const handleFormSubmit = async (values: ProductFormValues) => {
     try {
-      // Filter out empty image URLs before submitting
+      // Filter out empty image URLs and uploading placeholders before submitting
       const cleanedValues: any = {
         name: values.name,
         description: values.description,
@@ -113,8 +518,10 @@ export function ProductForm({
         stock: values.stock,
       };
       
-      // Handle images
-      const filteredImages = values.images?.filter(img => img.trim() !== '');
+      // Handle images - filter out empty URLs and uploading placeholders
+      const filteredImages = values.images?.filter(
+        img => img.trim() !== '' && !img.startsWith('uploading-')
+      );
       if (filteredImages && filteredImages.length > 0) {
         cleanedValues.images = filteredImages;
       }
@@ -404,71 +811,147 @@ export function ProductForm({
         <FormField
           control={form.control}
           name="images"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Зургууд</FormLabel>
-              <FormControl>
-                <div className="space-y-2">
-                  {images.map((image, index) => (
-                    <div key={index} className="flex gap-2 items-start">
-                      <div className="flex-1 flex gap-2">
-                        <Input
-                          type="url"
-                          placeholder="https://example.com/image.jpg"
-                          value={image}
-                          onChange={(e) => {
-                            const newImages = [...images];
-                            newImages[index] = e.target.value;
-                            field.onChange(newImages);
-                          }}
-                          className="flex-1"
-                        />
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="icon"
-                          onClick={() => {
-                            const newImages = images.filter((_, i) => i !== index);
-                            field.onChange(newImages.length > 0 ? newImages : undefined);
-                          }}
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </div>
-                      {image && (
-                        <div className="relative w-16 h-16 border rounded-md overflow-hidden flex-shrink-0">
-                          <img
-                            src={image}
-                            alt={`Preview ${index + 1}`}
-                            className="w-full h-full object-cover"
-                            onError={(e) => {
-                              const target = e.target as HTMLImageElement;
-                              target.style.display = 'none';
-                            }}
-                          />
+          render={({ field }) => {
+            const isUploading = uploadingFiles.size > 0;
+            
+            return (
+              <FormItem>
+                <FormLabel>Зургууд</FormLabel>
+                <FormControl>
+                  <div className="space-y-2">
+                    {images.map((image, index) => {
+                      const isUploadingThis = uploadingFiles.has(index);
+                      const isPlaceholder = image.startsWith('uploading-');
+                      
+                      return (
+                        <div key={index} className="flex gap-2 items-start">
+                          <div className="flex-1 flex gap-2">
+                            <Input
+                              type="url"
+                              placeholder="https://example.com/image.jpg эсвэл файл сонгоно уу"
+                              value={isPlaceholder || image.startsWith('blob:') ? '' : image}
+                              onChange={(e) => {
+                                const newValue = e.target.value;
+                                // Prevent storing blob URLs
+                                if (newValue.startsWith('blob:')) {
+                                  toast.error('Blob URLs cannot be stored. Please use a server URL or upload a file.');
+                                  return;
+                                }
+                                const newImages = [...images];
+                                newImages[index] = newValue;
+                                field.onChange(newImages);
+                              }}
+                              className="flex-1"
+                              disabled={isUploadingThis}
+                            />
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="icon"
+                              onClick={async () => {
+                                const imageToDelete = image;
+                                const isUploadedImage = uploadedImageUrls.has(imageToDelete);
+                                const isInitialImage = initialImages.includes(imageToDelete);
+                                
+                                // If this is an uploaded image (not from initial/defaultValues), delete it from server
+                                if (isUploadedImage && !isInitialImage) {
+                                  try {
+                                    await deleteImage(imageToDelete);
+                                    // Remove from tracked uploaded images
+                                    setUploadedImageUrls(prev => {
+                                      const newSet = new Set(prev);
+                                      newSet.delete(imageToDelete);
+                                      return newSet;
+                                    });
+                                  } catch (error) {
+                                    // Log error but still remove from form
+                                    console.error('Failed to delete image from server:', error);
+                                    toast.error('Зургийг серверээс устгахад алдаа гарлаа, гэхдээ жагсаалтаас хасав');
+                                  }
+                                }
+                                
+                                // Remove from form
+                                const newImages = images.filter((_, i) => i !== index);
+                                field.onChange(newImages.length > 0 ? newImages : undefined);
+                              }}
+                              disabled={isUploadingThis}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                          {image && !isPlaceholder && !image.startsWith('blob:') && (
+                            <div className="relative w-16 h-16 border rounded-md overflow-hidden flex-shrink-0">
+                              <img
+                                src={image}
+                                alt={`Preview ${index + 1}`}
+                                className="w-full h-full object-cover"
+                                onError={(e) => {
+                                  const target = e.target as HTMLImageElement;
+                                  target.style.display = 'none';
+                                }}
+                              />
+                            </div>
+                          )}
+                          {isUploadingThis && (
+                            <div className="relative w-16 h-16 border rounded-md overflow-hidden flex-shrink-0 flex items-center justify-center bg-muted">
+                              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                            </div>
+                          )}
                         </div>
-                      )}
+                      );
+                    })}
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => {
+                          fileInputRef.current?.click();
+                        }}
+                        disabled={isUploading}
+                        className="flex-1"
+                      >
+                        <Upload className="mr-2 h-4 w-4" />
+                        {isUploading ? 'Ачааллаж байна...' : 'Файл сонгох'}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => {
+                          field.onChange([...images, '']);
+                        }}
+                        disabled={isUploading}
+                        className="flex-1"
+                      >
+                        <Plus className="mr-2 h-4 w-4" />
+                        URL нэмэх
+                      </Button>
                     </div>
-                  ))}
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => {
-                      field.onChange([...images, '']);
-                    }}
-                    className="w-full"
-                  >
-                    <Plus className="mr-2 h-4 w-4" />
-                    Зураг нэмэх
-                  </Button>
-                </div>
-              </FormControl>
-              <FormMessage />
-              <p className="text-sm text-muted-foreground">
-                Бүтээгдэхүүний зургийн URL хаягуудыг оруулна уу
-              </p>
-            </FormItem>
-          )}
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
+                      multiple
+                      className="hidden"
+                      onChange={handleFileSelect}
+                      disabled={isUploading || isProcessingFilesRef.current}
+                    />
+                    {isUploading && uploadProgress > 0 && (
+                      <div className="w-full bg-muted rounded-full h-2">
+                        <div
+                          className="bg-primary h-2 rounded-full transition-all duration-300"
+                          style={{ width: `${uploadProgress}%` }}
+                        />
+                      </div>
+                    )}
+                  </div>
+                </FormControl>
+                <FormMessage />
+                <p className="text-sm text-muted-foreground">
+                  Зураг файл сонгох эсвэл URL хаяг оруулах боломжтой
+                </p>
+              </FormItem>
+            );
+          }}
         />
 
         <div className="flex gap-4">
@@ -477,6 +960,16 @@ export function ProductForm({
           </Button>
         </div>
       </form>
+      
+      {imageToCrop && (
+        <ImageCropDialog
+          open={cropDialogOpen}
+          onClose={handleCropDialogClose}
+          imageSrc={imageToCrop.url}
+          onCropComplete={handleCropComplete}
+          aspectRatio={1} // 1:1 square aspect ratio
+        />
+      )}
     </Form>
   );
 }

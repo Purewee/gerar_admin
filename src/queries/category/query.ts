@@ -23,6 +23,7 @@ function flattenCategories(categories: Category[]): Category[] {
         name: cat.name,
         description: cat.description,
         parentId: cat.parentId,
+        order: cat.order,
         createdAt: cat.createdAt,
         updatedAt: cat.updatedAt,
       });

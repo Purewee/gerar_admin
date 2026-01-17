@@ -13,6 +13,7 @@ import { Route as PublicRouteRouteImport } from './routes/_public/route'
 import { Route as DashboardRouteRouteImport } from './routes/_dashboard/route'
 import { Route as DashboardIndexRouteImport } from './routes/_dashboard/index'
 import { Route as DashboardPostsRouteRouteImport } from './routes/_dashboard/posts/route'
+import { Route as DashboardConstantsRouteRouteImport } from './routes/_dashboard/constants/route'
 import { Route as DashboardAboutRouteRouteImport } from './routes/_dashboard/about/route'
 import { Route as PublicLoginIndexRouteImport } from './routes/_public/login/index'
 import { Route as DashboardUsersIndexRouteImport } from './routes/_dashboard/users/index'
@@ -26,6 +27,7 @@ import { Route as DashboardProductsOrderRouteRouteImport } from './routes/_dashb
 import { Route as DashboardProductsNewRouteRouteImport } from './routes/_dashboard/products/new/route'
 import { Route as DashboardPostsPostIdRouteRouteImport } from './routes/_dashboard/posts/$postId/route'
 import { Route as DashboardOrdersIdRouteRouteImport } from './routes/_dashboard/orders/$id/route'
+import { Route as DashboardCategoriesOrderRouteRouteImport } from './routes/_dashboard/categories/order/route'
 import { Route as DashboardCategoriesNewRouteRouteImport } from './routes/_dashboard/categories/new/route'
 import { Route as DashboardPostsPostIdIndexRouteImport } from './routes/_dashboard/posts/$postId/index'
 import { Route as DashboardProductsIdEditRouteRouteImport } from './routes/_dashboard/products/$id/edit/route'
@@ -47,6 +49,11 @@ const DashboardIndexRoute = DashboardIndexRouteImport.update({
 const DashboardPostsRouteRoute = DashboardPostsRouteRouteImport.update({
   id: '/posts',
   path: '/posts',
+  getParentRoute: () => DashboardRouteRoute,
+} as any)
+const DashboardConstantsRouteRoute = DashboardConstantsRouteRouteImport.update({
+  id: '/constants',
+  path: '/constants',
   getParentRoute: () => DashboardRouteRoute,
 } as any)
 const DashboardAboutRouteRoute = DashboardAboutRouteRouteImport.update({
@@ -118,6 +125,12 @@ const DashboardOrdersIdRouteRoute = DashboardOrdersIdRouteRouteImport.update({
   path: '/orders/$id',
   getParentRoute: () => DashboardRouteRoute,
 } as any)
+const DashboardCategoriesOrderRouteRoute =
+  DashboardCategoriesOrderRouteRouteImport.update({
+    id: '/categories/order',
+    path: '/categories/order',
+    getParentRoute: () => DashboardRouteRoute,
+  } as any)
 const DashboardCategoriesNewRouteRoute =
   DashboardCategoriesNewRouteRouteImport.update({
     id: '/categories/new',
@@ -145,9 +158,11 @@ const DashboardCategoriesIdEditRouteRoute =
 
 export interface FileRoutesByFullPath {
   '/about': typeof DashboardAboutRouteRouteWithChildren
+  '/constants': typeof DashboardConstantsRouteRoute
   '/posts': typeof DashboardPostsRouteRouteWithChildren
   '/': typeof DashboardIndexRoute
   '/categories/new': typeof DashboardCategoriesNewRouteRoute
+  '/categories/order': typeof DashboardCategoriesOrderRouteRoute
   '/orders/$id': typeof DashboardOrdersIdRouteRoute
   '/posts/$postId': typeof DashboardPostsPostIdRouteRouteWithChildren
   '/products/new': typeof DashboardProductsNewRouteRoute
@@ -165,8 +180,10 @@ export interface FileRoutesByFullPath {
   '/posts/$postId/': typeof DashboardPostsPostIdIndexRoute
 }
 export interface FileRoutesByTo {
+  '/constants': typeof DashboardConstantsRouteRoute
   '/': typeof DashboardIndexRoute
   '/categories/new': typeof DashboardCategoriesNewRouteRoute
+  '/categories/order': typeof DashboardCategoriesOrderRouteRoute
   '/orders/$id': typeof DashboardOrdersIdRouteRoute
   '/products/new': typeof DashboardProductsNewRouteRoute
   '/products/order': typeof DashboardProductsOrderRouteRoute
@@ -187,9 +204,11 @@ export interface FileRoutesById {
   '/_dashboard': typeof DashboardRouteRouteWithChildren
   '/_public': typeof PublicRouteRouteWithChildren
   '/_dashboard/about': typeof DashboardAboutRouteRouteWithChildren
+  '/_dashboard/constants': typeof DashboardConstantsRouteRoute
   '/_dashboard/posts': typeof DashboardPostsRouteRouteWithChildren
   '/_dashboard/': typeof DashboardIndexRoute
   '/_dashboard/categories/new': typeof DashboardCategoriesNewRouteRoute
+  '/_dashboard/categories/order': typeof DashboardCategoriesOrderRouteRoute
   '/_dashboard/orders/$id': typeof DashboardOrdersIdRouteRoute
   '/_dashboard/posts/$postId': typeof DashboardPostsPostIdRouteRouteWithChildren
   '/_dashboard/products/new': typeof DashboardProductsNewRouteRoute
@@ -210,9 +229,11 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/about'
+    | '/constants'
     | '/posts'
     | '/'
     | '/categories/new'
+    | '/categories/order'
     | '/orders/$id'
     | '/posts/$postId'
     | '/products/new'
@@ -230,8 +251,10 @@ export interface FileRouteTypes {
     | '/posts/$postId/'
   fileRoutesByTo: FileRoutesByTo
   to:
+    | '/constants'
     | '/'
     | '/categories/new'
+    | '/categories/order'
     | '/orders/$id'
     | '/products/new'
     | '/products/order'
@@ -251,9 +274,11 @@ export interface FileRouteTypes {
     | '/_dashboard'
     | '/_public'
     | '/_dashboard/about'
+    | '/_dashboard/constants'
     | '/_dashboard/posts'
     | '/_dashboard/'
     | '/_dashboard/categories/new'
+    | '/_dashboard/categories/order'
     | '/_dashboard/orders/$id'
     | '/_dashboard/posts/$postId'
     | '/_dashboard/products/new'
@@ -304,6 +329,13 @@ declare module '@tanstack/react-router' {
       path: '/posts'
       fullPath: '/posts'
       preLoaderRoute: typeof DashboardPostsRouteRouteImport
+      parentRoute: typeof DashboardRouteRoute
+    }
+    '/_dashboard/constants': {
+      id: '/_dashboard/constants'
+      path: '/constants'
+      fullPath: '/constants'
+      preLoaderRoute: typeof DashboardConstantsRouteRouteImport
       parentRoute: typeof DashboardRouteRoute
     }
     '/_dashboard/about': {
@@ -397,6 +429,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardOrdersIdRouteRouteImport
       parentRoute: typeof DashboardRouteRoute
     }
+    '/_dashboard/categories/order': {
+      id: '/_dashboard/categories/order'
+      path: '/categories/order'
+      fullPath: '/categories/order'
+      preLoaderRoute: typeof DashboardCategoriesOrderRouteRouteImport
+      parentRoute: typeof DashboardRouteRoute
+    }
     '/_dashboard/categories/new': {
       id: '/_dashboard/categories/new'
       path: '/categories/new'
@@ -468,9 +507,11 @@ const DashboardPostsRouteRouteWithChildren =
 
 interface DashboardRouteRouteChildren {
   DashboardAboutRouteRoute: typeof DashboardAboutRouteRouteWithChildren
+  DashboardConstantsRouteRoute: typeof DashboardConstantsRouteRoute
   DashboardPostsRouteRoute: typeof DashboardPostsRouteRouteWithChildren
   DashboardIndexRoute: typeof DashboardIndexRoute
   DashboardCategoriesNewRouteRoute: typeof DashboardCategoriesNewRouteRoute
+  DashboardCategoriesOrderRouteRoute: typeof DashboardCategoriesOrderRouteRoute
   DashboardOrdersIdRouteRoute: typeof DashboardOrdersIdRouteRoute
   DashboardProductsNewRouteRoute: typeof DashboardProductsNewRouteRoute
   DashboardProductsOrderRouteRoute: typeof DashboardProductsOrderRouteRoute
@@ -485,9 +526,11 @@ interface DashboardRouteRouteChildren {
 
 const DashboardRouteRouteChildren: DashboardRouteRouteChildren = {
   DashboardAboutRouteRoute: DashboardAboutRouteRouteWithChildren,
+  DashboardConstantsRouteRoute: DashboardConstantsRouteRoute,
   DashboardPostsRouteRoute: DashboardPostsRouteRouteWithChildren,
   DashboardIndexRoute: DashboardIndexRoute,
   DashboardCategoriesNewRouteRoute: DashboardCategoriesNewRouteRoute,
+  DashboardCategoriesOrderRouteRoute: DashboardCategoriesOrderRouteRoute,
   DashboardOrdersIdRouteRoute: DashboardOrdersIdRouteRoute,
   DashboardProductsNewRouteRoute: DashboardProductsNewRouteRoute,
   DashboardProductsOrderRouteRoute: DashboardProductsOrderRouteRoute,

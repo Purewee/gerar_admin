@@ -1,5 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
+import { useEffect } from 'react';
 import { z } from 'zod';
 import { Button } from '@/components/ui/button';
 import {
@@ -32,6 +33,7 @@ interface CategoryFormProps {
   defaultValues?: Partial<CategoryFormValues & { id?: number }>;
   onSubmit: (values: CreateCategoryRequest) => Promise<void>;
   isLoading?: boolean;
+  disableParentSelect?: boolean;
 }
 
 export function CategoryForm({
@@ -39,6 +41,7 @@ export function CategoryForm({
   defaultValues,
   onSubmit,
   isLoading = false,
+  disableParentSelect = false,
 }: CategoryFormProps) {
   const form = useForm<CategoryFormValues>({
     resolver: zodResolver(categoryFormSchema),
@@ -49,9 +52,26 @@ export function CategoryForm({
     },
   });
 
+  // Reset form when defaultValues change (e.g., when Sheet opens with new parent)
+  useEffect(() => {
+    form.reset({
+      name: defaultValues?.name || '',
+      description: defaultValues?.description ?? '',
+      parentId: defaultValues?.parentId ?? null,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [defaultValues?.parentId, defaultValues?.name, defaultValues?.description]);
+
   // Filter out the current category from parent options (if editing)
+  // Also filter out subcategories (only show main categories as parent options)
   const availableParents = categories.filter(
-    (cat) => !defaultValues?.id || cat.id !== defaultValues.id,
+    (cat) => {
+      // Exclude subcategories (only main categories can be parents)
+      if (cat.parentId !== null) return false;
+      // Exclude current category if editing
+      if (defaultValues?.id && cat.id === defaultValues.id) return false;
+      return true;
+    }
   );
 
   // Filter out categories that would create circular references
@@ -61,7 +81,7 @@ export function CategoryForm({
     // Prevent selecting a category that has the current category as an ancestor
     const excludeIds = new Set<number>([defaultValues.id]);
     const findDescendants = (parentId: number) => {
-      availableParents.forEach((cat) => {
+      categories.forEach((cat) => {
         if (cat.parentId === parentId) {
           excludeIds.add(cat.id);
           findDescendants(cat.id);
@@ -129,9 +149,10 @@ export function CategoryForm({
                 onValueChange={(value) =>
                   field.onChange(value === '__none__' ? null : Number(value))
                 }
+                disabled={disableParentSelect}
               >
                 <FormControl>
-                  <SelectTrigger>
+                  <SelectTrigger disabled={disableParentSelect}>
                     <SelectValue placeholder="Select a parent category (optional)" />
                   </SelectTrigger>
                 </FormControl>
