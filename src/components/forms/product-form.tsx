@@ -115,6 +115,7 @@ export function ProductForm({
       name: defaultValues?.name || '',
       description: defaultValues?.description || '',
       price: defaultValues?.price || 0,
+      originalPrice: defaultValues?.originalPrice ?? null,
       stock: defaultValues?.stock || 0,
       categoryId: defaultValues?.categoryId,
       categoryIds: defaultValues?.categoryIds || (defaultValues?.categoryId ? [defaultValues.categoryId] : []),
@@ -515,6 +516,7 @@ export function ProductForm({
         name: values.name,
         description: values.description,
         price: values.price,
+        originalPrice: values.originalPrice ?? null,
         stock: values.stock,
       };
       
@@ -592,92 +594,190 @@ export function ProductForm({
           )}
         />
 
-        <div className="grid grid-cols-2 gap-4">
-          <FormField
-            control={form.control}
-            name="price"
-            render={({ field }) => {
-              const isFocusedRef = useRef(false);
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <FormField
+              control={form.control}
+              name="price"
+              render={({ field }) => {
+                const isFocusedRef = useRef(false);
 
-              return (
-                <FormItem>
-                  <FormLabel>Барааны үнэ *</FormLabel>
-                  <FormControl>
-                    <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none">
-                        ₮
-                      </span>
-                      <Input
-                        type="text"
-                        placeholder="1,234.56"
-                        className="pl-8"
-                        defaultValue={field.value && field.value > 0 ? formatPriceInput(field.value) : ''}
-                        onFocus={(e) => {
-                          isFocusedRef.current = true;
-                          // Remove formatting when focused to allow editing
-                          const rawValue = parsePriceInput(e.target.value).toString();
-                          if (rawValue !== '0') {
-                            e.target.value = rawValue;
-                          } else {
-                            e.target.value = '';
-                          }
-                        }}
-                        onChange={(e) => {
-                          const inputValue = e.target.value;
-                          
-                          // Allow empty input
-                          if (inputValue === '') {
-                            field.onChange(0);
-                            return;
-                          }
-                          
-                          // Remove currency symbol and commas if user types them
-                          const cleaned = inputValue.replace(/[₮,]/g, '').trim();
-                          // Remove all non-numeric except decimal point
-                          const numericValue = cleaned.replace(/[^\d.]/g, '');
-                          
-                          // Prevent multiple decimal points
-                          const parts = numericValue.split('.');
-                          let finalValue = parts[0];
-                          if (parts.length > 1) {
-                            finalValue += '.' + parts.slice(1).join('').slice(0, 2);
-                          }
-                          
-                          // Update input value (raw numeric)
-                          if (e.target.value !== finalValue) {
-                            e.target.value = finalValue;
-                          }
-                          
-                          // Parse and update form value
-                          const parsed = parseFloat(finalValue);
-                          if (!isNaN(parsed)) {
-                            field.onChange(parsed);
-                          } else {
-                            field.onChange(0);
-                          }
-                        }}
-                        onBlur={(e) => {
-                          isFocusedRef.current = false;
-                          // Format on blur
-                          const parsed = parsePriceInput(e.target.value);
-                          if (parsed > 0) {
-                            const formatted = formatPriceInput(parsed);
-                            e.target.value = formatted;
-                            field.onChange(parsed);
-                          } else {
-                            e.target.value = '';
-                            field.onChange(0);
-                          }
-                          field.onBlur();
-                        }}
-                      />
-                    </div>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              );
-            }}
-          />
+                return (
+                  <FormItem>
+                    <FormLabel className="text-base font-semibold">
+                      <span className="text-primary">Одоогийн үнэ (Зарах үнэ) *</span>
+                    </FormLabel>
+                    <FormControl>
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none">
+                          ₮
+                        </span>
+                        <Input
+                          type="text"
+                          placeholder="1,234.56"
+                          className="pl-8 border-primary/20"
+                          defaultValue={field.value && field.value > 0 ? formatPriceInput(field.value) : ''}
+                          onFocus={(e) => {
+                            isFocusedRef.current = true;
+                            // Remove formatting when focused to allow editing
+                            const rawValue = parsePriceInput(e.target.value).toString();
+                            if (rawValue !== '0') {
+                              e.target.value = rawValue;
+                            } else {
+                              e.target.value = '';
+                            }
+                          }}
+                          onChange={(e) => {
+                            const inputValue = e.target.value;
+                            
+                            // Allow empty input
+                            if (inputValue === '') {
+                              field.onChange(0);
+                              return;
+                            }
+                            
+                            // Remove currency symbol and commas if user types them
+                            const cleaned = inputValue.replace(/[₮,]/g, '').trim();
+                            // Remove all non-numeric except decimal point
+                            const numericValue = cleaned.replace(/[^\d.]/g, '');
+                            
+                            // Prevent multiple decimal points
+                            const parts = numericValue.split('.');
+                            let finalValue = parts[0];
+                            if (parts.length > 1) {
+                              finalValue += '.' + parts.slice(1).join('').slice(0, 2);
+                            }
+                            
+                            // Update input value (raw numeric)
+                            if (e.target.value !== finalValue) {
+                              e.target.value = finalValue;
+                            }
+                            
+                            // Parse and update form value
+                            const parsed = parseFloat(finalValue);
+                            if (!isNaN(parsed)) {
+                              field.onChange(parsed);
+                            } else {
+                              field.onChange(0);
+                            }
+                          }}
+                          onBlur={(e) => {
+                            isFocusedRef.current = false;
+                            // Format on blur
+                            const parsed = parsePriceInput(e.target.value);
+                            if (parsed > 0) {
+                              const formatted = formatPriceInput(parsed);
+                              e.target.value = formatted;
+                              field.onChange(parsed);
+                            } else {
+                              e.target.value = '';
+                              field.onChange(0);
+                            }
+                            field.onBlur();
+                          }}
+                        />
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Хэрэглэгчдэд харагдах үнэ
+                    </p>
+                  </FormItem>
+                );
+              }}
+            />
+
+            <FormField
+              control={form.control}
+              name="originalPrice"
+              render={({ field }) => {
+                const isFocusedRef = useRef(false);
+
+                return (
+                  <FormItem>
+                    <FormLabel className="text-base font-semibold">
+                      <span className="text-muted-foreground">Анхны үнэ (Хөнгөлөлтөөс өмнө)</span>
+                    </FormLabel>
+                    <FormControl>
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none">
+                          ₮
+                        </span>
+                        <Input
+                          type="text"
+                          placeholder="1,234.56 (сонголттой)"
+                          className="pl-8"
+                          defaultValue={field.value && field.value > 0 ? formatPriceInput(field.value) : ''}
+                          onFocus={(e) => {
+                            isFocusedRef.current = true;
+                            // Remove formatting when focused to allow editing
+                            const rawValue = parsePriceInput(e.target.value).toString();
+                            if (rawValue !== '0') {
+                              e.target.value = rawValue;
+                            } else {
+                              e.target.value = '';
+                            }
+                          }}
+                          onChange={(e) => {
+                            const inputValue = e.target.value;
+                            
+                            // Allow empty input (null)
+                            if (inputValue === '') {
+                              field.onChange(null);
+                              return;
+                            }
+                            
+                            // Remove currency symbol and commas if user types them
+                            const cleaned = inputValue.replace(/[₮,]/g, '').trim();
+                            // Remove all non-numeric except decimal point
+                            const numericValue = cleaned.replace(/[^\d.]/g, '');
+                            
+                            // Prevent multiple decimal points
+                            const parts = numericValue.split('.');
+                            let finalValue = parts[0];
+                            if (parts.length > 1) {
+                              finalValue += '.' + parts.slice(1).join('').slice(0, 2);
+                            }
+                            
+                            // Update input value (raw numeric)
+                            if (e.target.value !== finalValue) {
+                              e.target.value = finalValue;
+                            }
+                            
+                            // Parse and update form value
+                            const parsed = parseFloat(finalValue);
+                            if (!isNaN(parsed)) {
+                              field.onChange(parsed);
+                            } else {
+                              field.onChange(null);
+                            }
+                          }}
+                          onBlur={(e) => {
+                            isFocusedRef.current = false;
+                            // Format on blur
+                            const parsed = parsePriceInput(e.target.value);
+                            if (parsed > 0) {
+                              const formatted = formatPriceInput(parsed);
+                              e.target.value = formatted;
+                              field.onChange(parsed);
+                            } else {
+                              e.target.value = '';
+                              field.onChange(null);
+                            }
+                            field.onBlur();
+                          }}
+                        />
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Хөнгөлөлт үзүүлэхэд шаардлагатай. Анхны үнэ одоогийн үнээс их байвал хөнгөлөлт автоматаар тооцогдоно
+                    </p>
+                  </FormItem>
+                );
+              }}
+            />
+          </div>
 
           <FormField
             control={form.control}

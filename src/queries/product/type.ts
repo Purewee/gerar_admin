@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { CategorySchema } from '../category/type';
+import { CategorySchema, AdminUserSchema } from '../category/type';
 
 // Base product schema - handles both old (single category) and new (multiple categories) formats
 export const ProductSchema = z.object({
@@ -22,12 +22,17 @@ export const ProductSchema = z.object({
   category: CategorySchema.optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
+  createdBy: z.number().nullable().optional(),
+  updatedBy: z.number().nullable().optional(),
+  creator: AdminUserSchema.nullable().optional(),
+  updater: AdminUserSchema.nullable().optional(),
 }).passthrough(); // Allow additional fields that might be in the API response
 
 export const CreateProductSchema = z.object({
   name: z.string().min(1, 'Name is required'),
   description: z.string().min(1, 'Description is required'),
   price: z.number().positive('Price must be positive'),
+  originalPrice: z.number().positive('Original price must be positive').nullable().optional(),
   stock: z.number().int().min(0, 'Stock must be non-negative'),
   categoryId: z.number().int().positive('Category is required').optional(),
   categoryIds: z.array(z.number().int().positive()).min(1, 'At least one category is required').optional(),
@@ -41,6 +46,7 @@ export const UpdateProductSchema = z.object({
   name: z.string().optional(),
   description: z.string().optional(),
   price: z.number().positive().optional(),
+  originalPrice: z.number().positive('Original price must be positive').nullable().optional(),
   stock: z.number().int().min(0).optional(),
   categoryId: z.number().int().positive().optional(),
   categoryIds: z.array(z.number().int().positive()).min(1).optional(),

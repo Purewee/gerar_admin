@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
-import { Plus, Edit, Trash2, Search, X, Filter, Image as ImageIcon } from 'lucide-react';
+import { Plus, Edit, Trash2, Search, X, Filter, Image as ImageIcon, Info } from 'lucide-react';
 import { useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -40,6 +40,11 @@ import type { Product } from '@/queries/product/type';
 import type { ProductSearchParams } from '@/queries/product/query';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatPrice } from '@/lib/utils';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 
 export const Route = createFileRoute('/_dashboard/products/')({
   component: ProductsPage,
@@ -540,14 +545,84 @@ function ProductsPage() {
                           </div>
                         )}
                       </TableCell>
-                      <TableCell className="font-medium">{product.name}</TableCell>
+                      <TableCell className="font-medium">
+                        <div className="flex items-center gap-2">
+                          <span>{product.name}</span>
+                          {(product.creator || product.updater) && (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Info className="h-4 w-4 text-muted-foreground cursor-help" />
+                              </TooltipTrigger>
+                              <TooltipContent className="max-w-xs">
+                                <div className="space-y-1 text-xs">
+                                  {product.creator && (
+                                    <div>
+                                      <div className="font-semibold">Үүсгэсэн:</div>
+                                      <div>{product.creator.name}</div>
+                                      <div className="text-muted-foreground">{product.creator.phoneNumber}</div>
+                                    </div>
+                                  )}
+                                  {product.updater && (
+                                    <div className={product.creator ? 'mt-2 pt-2 border-t' : ''}>
+                                      <div className="font-semibold">Шинэчлэсэн:</div>
+                                      <div>{product.updater.name}</div>
+                                      <div className="text-muted-foreground">{product.updater.phoneNumber}</div>
+                                    </div>
+                                  )}
+                                </div>
+                              </TooltipContent>
+                            </Tooltip>
+                          )}
+                        </div>
+                      </TableCell>
                       <TableCell className="max-w-md truncate">
                         {product.description}
                       </TableCell>
                       <TableCell>
-                        {product.categories && product.categories.length > 0
-                          ? product.categories.map(cat => cat.name).join(', ')
-                          : product.category?.name || 'N/A'}
+                        {(() => {
+                          const categories = product.categories && product.categories.length > 0
+                            ? product.categories
+                            : product.category
+                              ? [product.category]
+                              : [];
+                          
+                          if (categories.length === 0) {
+                            return <span className="text-muted-foreground">N/A</span>;
+                          }
+                          
+                          const displayCount = 1; // Show first category
+                          const displayCategories = categories.slice(0, displayCount);
+                          const remainingCount = categories.length - displayCount;
+                          
+                          return (
+                            <div className="flex items-center gap-1 flex-wrap">
+                              {displayCategories.map((cat, idx) => (
+                                <span key={cat.id || idx} className="text-sm">
+                                  {cat.name}
+                                </span>
+                              ))}
+                              {remainingCount > 0 && (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Badge variant="secondary" className="cursor-help text-xs">
+                                      +{remainingCount} {remainingCount === 1 ? 'бусад' : 'бусад'}
+                                    </Badge>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <div className="space-y-1">
+                                      <div className="font-semibold text-xs mb-1">Бүх ангилал:</div>
+                                      {categories.map((cat, idx) => (
+                                        <div key={cat.id || idx} className="text-xs">
+                                          {cat.name}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </TooltipContent>
+                                </Tooltip>
+                              )}
+                            </div>
+                          );
+                        })()}
                       </TableCell>
                       <TableCell>{formatPrice(product.price)}</TableCell>
                       <TableCell>

@@ -75,6 +75,7 @@ function EditProductPage() {
               name: product.name,
               description: product.description,
               price: parseFloat(product.price),
+              originalPrice: product.originalPrice ? parseFloat(product.originalPrice) : null,
               stock: product.stock,
               categoryId: product.categoryId || undefined,
               categoryIds: product.categories?.map(cat => cat.id) || (product.categoryId ? [product.categoryId] : []),

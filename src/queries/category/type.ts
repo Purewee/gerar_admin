@@ -1,5 +1,13 @@
 import { z } from 'zod';
 
+// Admin user schema for creator/updater fields
+export const AdminUserSchema = z.object({
+  id: z.number(),
+  name: z.string(),
+  phoneNumber: z.string(),
+  email: z.string().nullable(),
+});
+
 // Define the type first to avoid circular reference in the schema
 type CategoryType = {
   id: number;
@@ -9,6 +17,10 @@ type CategoryType = {
   order?: number;
   createdAt: string;
   updatedAt: string;
+  createdBy?: number | null;
+  updatedBy?: number | null;
+  creator?: z.infer<typeof AdminUserSchema> | null;
+  updater?: z.infer<typeof AdminUserSchema> | null;
   children?: CategoryType[];
   subcategories?: CategoryType[];
 };
@@ -21,6 +33,10 @@ export const CategorySchema: z.ZodType<CategoryType> = z.object({
   order: z.number().optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
+  createdBy: z.number().nullable().optional(),
+  updatedBy: z.number().nullable().optional(),
+  creator: AdminUserSchema.nullable().optional(),
+  updater: AdminUserSchema.nullable().optional(),
   children: z.array(z.lazy(() => CategorySchema)).optional(),
   // Keep subcategories for backwards compatibility, but prefer children
   subcategories: z.array(z.lazy(() => CategorySchema)).optional(),

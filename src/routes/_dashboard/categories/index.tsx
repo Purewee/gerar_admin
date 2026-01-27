@@ -103,6 +103,14 @@ function CategoryTree({
                 {category.description}
               </div>
             )}
+            <div className="flex gap-4 mt-1 text-xs text-muted-foreground">
+              {category.creator && (
+                <span>Үүсгэсэн: {category.creator.name}</span>
+              )}
+              {category.updater && (
+                <span>Шинэчлэсэн: {category.updater.name}</span>
+              )}
+            </div>
           </div>
           <div className="flex items-center gap-2">
             {category.parentId && (
