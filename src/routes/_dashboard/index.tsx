@@ -7,6 +7,17 @@ import { fetchOrdersOptions } from '@/queries/order/options';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Package, ShoppingCart, FolderTree, TrendingUp } from 'lucide-react';
 import { formatPrice } from '@/lib/utils';
+import { STATUS_CANCELLED_BY_ADMIN, STATUS_DELIVERY_STARTED } from '@/queries/order/type';
+
+const ORDER_STATUS_LABELS: Record<string, string> = {
+  PENDING: 'Төлбөр хүлээгдэх',
+  COMPLETED: 'Төлбөр төлөгдсөн',
+  CANCELLED: 'Цуцлагдсан',
+  [STATUS_CANCELLED_BY_ADMIN]: 'Цуцлагдсан (админ баталгаажуулсан)',
+  DELIVERED: 'Хүргэгдсэн',
+  [STATUS_DELIVERY_STARTED]: 'Хүргэлт эхэлсэн',
+  'Хүргэгдсэн': 'Хүргэгдсэн',
+};
 
 export const Route = createFileRoute('/_dashboard/')({
   component: DashboardHome,
@@ -148,7 +159,7 @@ function DashboardHome() {
                       <p className="font-medium">
                         {formatPrice(order.totalAmount)}
                       </p>
-                      <p className="text-sm text-muted-foreground">{order.status}</p>
+                      <p className="text-sm text-muted-foreground">{ORDER_STATUS_LABELS[order.status] ?? order.status}</p>
                     </div>
                   </div>
                 ))}

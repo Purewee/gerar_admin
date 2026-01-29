@@ -1,6 +1,6 @@
 import adminFetchAndValidate from '@/lib/admin-fetcher';
 import { API_BASE_URL } from '@/lib/api-config';
-import { getStoredAuth, clearAuth, isTokenExpiredError } from '@/lib/auth-utils';
+import { getStoredAuth, clearAuth } from '@/lib/auth-utils';
 import type {
   CreateProductRequest,
   UpdateProductRequest,
@@ -25,6 +25,8 @@ export interface ProductSearchParams {
   sortOrder?: 'asc' | 'desc';
   page?: number;
   limit?: number;
+  includeHidden?: boolean;
+  includeDeleted?: boolean;
 }
 
 export const getProducts = async (params?: ProductSearchParams): Promise<Product[]> => {
@@ -78,6 +80,12 @@ export const getProducts = async (params?: ProductSearchParams): Promise<Product
     if (params.limit !== undefined) {
       url.searchParams.append('limit', String(params.limit));
     }
+    if (params.includeHidden !== undefined) {
+      url.searchParams.append('includeHidden', String(params.includeHidden));
+    }
+    if (params.includeDeleted !== undefined) {
+      url.searchParams.append('includeDeleted', String(params.includeDeleted));
+    }
   }
 
   const headers: Record<string, string> = {
@@ -88,24 +96,52 @@ export const getProducts = async (params?: ProductSearchParams): Promise<Product
     headers.Authorization = `Bearer ${token}`;
   }
 
-  const res = await fetch(url.toString(), {
-    headers,
-  });
+  // Create AbortController for timeout (10 seconds)
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+  let res: Response;
+  try {
+    res = await fetch(url.toString(), {
+      headers,
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+  } catch (error) {
+    clearTimeout(timeoutId);
+    
+    // Handle abort (timeout)
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error('Request timeout: The server took longer than 10s to respond.');
+    }
+    throw error;
+  }
+
+  // Check status code BEFORE parsing JSON to fail fast on 401
+  if (res.status === 401) {
+    clearAuth();
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('auth:cleared'));
+      window.location.href = '/login';
+    }
+    throw new Error('Your session has expired. Please log in again.');
+  }
+
   const json = await res.json();
 
   if (!res.ok) {
     const errorMessage = json.error?.message || json.message || `Request failed with status ${res.status}`;
-    
-    // Check if this is a token expiration/invalid token error
-    if (res.status === 401 || (token && (isTokenExpiredError(errorMessage) || isTokenExpiredError(json)))) {
-      // Clear auth data and redirect to login
+
+    // Handle 403 Forbidden as well
+    if (res.status === 403) {
       clearAuth();
       if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('auth:cleared'));
         window.location.href = '/login';
       }
-      throw new Error('Your session has expired. Please log in again.');
+      throw new Error('Access denied. Please log in again.');
     }
-    
+
     throw new Error(errorMessage);
   }
 
@@ -178,4 +214,37 @@ export const deleteProduct = async (id: number): Promise<Product> => {
     },
   );
   return response.data;
-}
+};
+
+export const hideProduct = async (id: number): Promise<Product> => {
+  const response = await adminFetchAndValidate(
+    `/admin/products/${id}/hide`,
+    ProductResponseSchema,
+    {
+      method: 'POST',
+    },
+  );
+  return response.data;
+};
+
+export const unhideProduct = async (id: number): Promise<Product> => {
+  const response = await adminFetchAndValidate(
+    `/admin/products/${id}/unhide`,
+    ProductResponseSchema,
+    {
+      method: 'POST',
+    },
+  );
+  return response.data;
+};
+
+export const restoreProduct = async (id: number): Promise<Product> => {
+  const response = await adminFetchAndValidate(
+    `/admin/products/${id}/restore`,
+    ProductResponseSchema,
+    {
+      method: 'POST',
+    },
+  );
+  return response.data;
+};

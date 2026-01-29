@@ -34,23 +34,16 @@ PassengerEnabled off
   RewriteEngine On
   RewriteBase /
   
-  # Redirect root to dist folder
-  RewriteRule ^$ /dist/ [L]
-  
-  # Skip rewriting for actual files in dist
+  # Skip rewriting for actual files
   RewriteCond %{REQUEST_FILENAME} -f
   RewriteRule ^ - [L]
   
-  # Skip rewriting for actual directories in dist
+  # Skip rewriting for actual directories
   RewriteCond %{REQUEST_FILENAME} -d
   RewriteRule ^ - [L]
   
-  # Check if file exists in dist folder
-  RewriteCond %{DOCUMENT_ROOT}/dist/$1 -f
-  RewriteRule ^(.*)$ /dist/$1 [L]
-  
-  # Route everything else to dist/index.html for SPA routing
-  RewriteRule ^ /dist/index.html [L]
+  # Route everything else to index.html for SPA routing
+  RewriteRule ^ /index.html [L]
 </IfModule>
 
 # Enable compression

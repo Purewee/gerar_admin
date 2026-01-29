@@ -1,7 +1,10 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import {
   Table,
   TableBody,
@@ -11,9 +14,20 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Separator } from '@/components/ui/separator';
-import { fetchOrderOptions } from '@/queries/order/options';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { fetchOrderOptions, useRequestCancellation, useConfirmCancellation, useUpdateOrderStatus } from '@/queries/order/options';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatPrice } from '@/lib/utils';
+import { toast } from 'sonner';
+import { XCircle, ShieldCheck, Truck, PackageCheck } from 'lucide-react';
+import { STATUS_DELIVERY_STARTED } from '@/queries/order/type';
 
 export const Route = createFileRoute('/_dashboard/orders/$id')({
   component: OrderDetailPage,
@@ -24,10 +38,21 @@ export const Route = createFileRoute('/_dashboard/orders/$id')({
 
 function OrderDetailPage() {
   const { orderId } = Route.useLoaderData();
+  
+  // Fetch order by ID via GET /api/admin/orders/:id (admin can view any order)
   const { data: order, isLoading } = useQuery(fetchOrderOptions(orderId));
+  
+  const requestCancellationMutation = useRequestCancellation();
+  const confirmCancellationMutation = useConfirmCancellation();
+  const updateOrderStatusMutation = useUpdateOrderStatus();
+  
+  const [showConfirmRequestDialog, setShowConfirmRequestDialog] = useState(false);
+  const [showCancellationDialog, setShowCancellationDialog] = useState(false);
+  const [cancellationCode, setCancellationCode] = useState('');
+  const [hasRequestedCancellation, setHasRequestedCancellation] = useState(false);
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleString('en-US', {
+    return new Date(dateString).toLocaleString('mn-MN', {
       year: 'numeric',
       month: 'long',
       day: 'numeric',
@@ -36,18 +61,103 @@ function OrderDetailPage() {
     });
   };
 
+  const statusLabels: Record<string, string> = {
+    PENDING: 'Төлбөр хүлээгдэх',
+    COMPLETED: 'Төлбөр төлөгдсөн',
+    CANCELLED: 'Цуцлагдсан',
+    CANCELLED_BY_ADMIN: 'Цуцлагдсан (админ баталгаажуулсан)',
+    DELIVERED: 'Хүргэгдсэн',
+    [STATUS_DELIVERY_STARTED]: 'Хүргэлт эхэлсэн',
+    'Хүргэгдсэн': 'Хүргэгдсэн', // Handle Mongolian status string from backend
+  };
+
   const getStatusBadge = (status: string) => {
     const variants = {
       PENDING: 'secondary',
       COMPLETED: 'default',
       CANCELLED: 'destructive',
+      CANCELLED_BY_ADMIN: 'destructive',
+      DELIVERED: 'default',
+      [STATUS_DELIVERY_STARTED]: 'outline',
+      'Хүргэгдсэн': 'default', // Handle Mongolian status string from backend
     } as const;
 
     return (
       <Badge variant={variants[status as keyof typeof variants] || 'secondary'}>
-        {status}
+        {statusLabels[status] ?? status}
       </Badge>
     );
+  };
+
+  // Check if order can be cancelled (paid/completed orders only, and must have user phone)
+  const canCancelOrder =
+    order &&
+    order.status === 'COMPLETED' &&
+    order.user?.phoneNumber;
+
+  const handleRequestCancellation = async () => {
+    if (!order) return;
+
+    try {
+      await requestCancellationMutation.mutateAsync(orderId);
+      toast.success('Цуцлах код SMS-аар илгээгдлээ. Хэрэглэгчээс кодыг авч баталгаажуулна уу.');
+      setHasRequestedCancellation(true);
+      setShowConfirmRequestDialog(false);
+      setShowCancellationDialog(true);
+    } catch (error) {
+      // Check if error message suggests SMS was sent despite the error
+      const errorMessage = error instanceof Error ? error.message : 'Цуцлах код илгээхэд алдаа гарлаа';
+      
+      // If the error mentions "sms result" or similar, the SMS might have been sent
+      // but there was a backend error in the response handling
+      if (errorMessage.toLowerCase().includes('sms') || errorMessage.toLowerCase().includes('result')) {
+        console.warn('SMS may have been sent despite error:', errorMessage);
+        // Still proceed with the cancellation flow since SMS was likely sent
+        toast.warning('Код илгээгдсэн байж магадгүй. Хэрэв хэрэглэгч SMS хүлээн авсан бол үргэлжлүүлнэ үү.');
+        setHasRequestedCancellation(true);
+        setShowConfirmRequestDialog(false);
+        setShowCancellationDialog(true);
+      } else {
+        toast.error(errorMessage);
+        setShowConfirmRequestDialog(false);
+      }
+    }
+  };
+
+  const handleConfirmCancellation = async () => {
+    if (!cancellationCode.trim() || cancellationCode.length !== 4) {
+      toast.error('4 оронтой кодыг оруулна уу');
+      return;
+    }
+
+    try {
+      await confirmCancellationMutation.mutateAsync({
+        orderId,
+        code: cancellationCode.trim(),
+      });
+      toast.success('Захиалга амжилттай цуцлагдлаа');
+      setShowCancellationDialog(false);
+      setCancellationCode('');
+      setHasRequestedCancellation(false);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Цуцлах баталгаажуулахад алдаа гарлаа';
+      toast.error(errorMessage);
+    }
+  };
+
+  const handleUpdateStatus = async (status: string) => {
+    if (!order) return;
+
+    try {
+      await updateOrderStatusMutation.mutateAsync({
+        orderId,
+        status,
+      });
+      toast.success(`Захиалгын төлөв "${statusLabels[status] ?? status}" болгож шинэчлэгдлээ`);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Төлөв шинэчлэхэд алдаа гарлаа';
+      toast.error(errorMessage);
+    }
   };
 
   if (isLoading) {
@@ -68,8 +178,11 @@ function OrderDetailPage() {
 
   if (!order) {
     return (
-      <div className="flex items-center justify-center p-8">
-        <div className="text-muted-foreground">Order not found</div>
+      <div className="flex flex-col items-center justify-center p-8 space-y-4">
+        <div className="text-muted-foreground text-lg">Захиалга олдсонгүй</div>
+        <p className="text-sm text-muted-foreground">
+          Захиалгын ID: {orderId}
+        </p>
       </div>
     );
   }
@@ -77,71 +190,112 @@ function OrderDetailPage() {
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-3xl font-bold">Order #{order.id}</h1>
-        <p className="text-muted-foreground">Order details and information</p>
+        <h1 className="text-3xl font-bold">Захиалга #{order.id}</h1>
+        <p className="text-muted-foreground">Захиалгын дэлгэрэнгүй мэдээлэл</p>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle>Customer Information</CardTitle>
+            <CardTitle>Хэрэглэгчийн мэдээлэл</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
             <div>
-              <span className="text-sm font-medium text-muted-foreground">Name:</span>
-              <p className="text-lg">{order.user?.name || "N/A"}</p>
+              <span className="text-sm font-medium text-muted-foreground">Нэр:</span>
+              <p className="text-lg">{order.user?.name || "Байхгүй"}</p>
             </div>
             <div>
-              <span className="text-sm font-medium text-muted-foreground">Phone:</span>
-              <p className="text-lg">{order.user?.phoneNumber || "N/A"}</p>
+              <span className="text-sm font-medium text-muted-foreground">Утас:</span>
+              <p className="text-lg">{order.user?.phoneNumber || "Байхгүй"}</p>
             </div>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle>Order Information</CardTitle>
+            <CardTitle>Захиалгын мэдээлэл</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
             <div>
-              <span className="text-sm font-medium text-muted-foreground">Status:</span>
+              <span className="text-sm font-medium text-muted-foreground">Төлөв:</span>
               <div className="mt-1">{getStatusBadge(order.status)}</div>
             </div>
+            {(order.status === 'COMPLETED' || order.status === STATUS_DELIVERY_STARTED) && (
+              <div className="pt-4 border-t space-y-2">
+                {order.status === 'COMPLETED' && (
+                  <Button
+                    variant="outline"
+                    onClick={() => handleUpdateStatus(STATUS_DELIVERY_STARTED)}
+                    disabled={updateOrderStatusMutation.isPending}
+                    className="w-full text-amber-600 hover:text-amber-700 hover:bg-amber-50 hover:border-amber-200"
+                  >
+                    <Truck className="mr-2 h-4 w-4" />
+                    {updateOrderStatusMutation.isPending
+                      ? 'Шинэчлэж байна...'
+                      : 'Хүргэлтэд гарсан'}
+                  </Button>
+                )}
+                <Button
+                  variant="default"
+                  onClick={() => handleUpdateStatus('Хүргэгдсэн')}
+                  disabled={updateOrderStatusMutation.isPending}
+                  className="w-full bg-green-600 text-white hover:bg-green-700 hover:text-white"
+                >
+                  <PackageCheck className="mr-2 h-4 w-4" />
+                  {updateOrderStatusMutation.isPending
+                    ? 'Шинэчлэж байна...'
+                    : 'Хүргэгдсэн болгох'}
+                </Button>
+              </div>
+            )}
             <div>
-              <span className="text-sm font-medium text-muted-foreground">Created:</span>
+              <span className="text-sm font-medium text-muted-foreground">Үүсгэсэн:</span>
               <p className="text-lg">{formatDate(order.createdAt)}</p>
             </div>
             <div>
-              <span className="text-sm font-medium text-muted-foreground">Last Updated:</span>
+              <span className="text-sm font-medium text-muted-foreground">Сүүлд шинэчлэгдсэн:</span>
               <p className="text-lg">{formatDate(order.updatedAt)}</p>
             </div>
+            {canCancelOrder && (
+              <div className="pt-4 border-t">
+                <Button
+                  variant="destructive"
+                  onClick={() => setShowConfirmRequestDialog(true)}
+                  disabled={requestCancellationMutation.isPending}
+                  className="w-full"
+                >
+                  <XCircle className="mr-2 h-4 w-4" />
+                  Захиалга цуцлах
+                </Button>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Order Items</CardTitle>
-          <CardDescription>{order.items.length} items in this order</CardDescription>
+          <CardTitle>Захиалгын бараанууд</CardTitle>
+          <CardDescription>Энэ захиалгад {order.items.length} бараа</CardDescription>
         </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Product</TableHead>
-                <TableHead>Category</TableHead>
-                <TableHead>Quantity</TableHead>
-                <TableHead>Unit Price</TableHead>
-                <TableHead className="text-right">Subtotal</TableHead>
+                <TableHead>Бараа</TableHead>
+                <TableHead>Ангилал</TableHead>
+                <TableHead>Тоо ширхэг</TableHead>
+                <TableHead>Нэгжийн үнэ</TableHead>
+                <TableHead className="text-right">Дэд дүн</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {order.items.map((item) => (
                 <TableRow key={item.id}>
                   <TableCell className="font-medium">
-                    {item.product?.name || 'N/A'}
+                    {item.product?.name || 'Байхгүй'}
                   </TableCell>
-                  <TableCell>{item.product?.category?.name || 'N/A'}</TableCell>
+                  <TableCell>{item.product?.category?.name || 'Байхгүй'}</TableCell>
                   <TableCell>{item.quantity}</TableCell>
                   <TableCell>{formatPrice(item.price)}</TableCell>
                   <TableCell className="text-right">
@@ -155,12 +309,120 @@ function OrderDetailPage() {
           <div className="flex justify-end">
             <div className="space-y-2 text-right">
               <div className="text-lg font-semibold">
-                Total: {formatPrice(order.totalAmount)}
+                Нийт: {formatPrice(order.totalAmount)}
               </div>
             </div>
           </div>
         </CardContent>
       </Card>
+
+      {/* Request Cancellation Confirmation Dialog */}
+      <Dialog open={showConfirmRequestDialog} onOpenChange={setShowConfirmRequestDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <XCircle className="h-5 w-5 text-destructive" />
+              Захиалга цуцлах эсэхийг баталгаажуулах
+            </DialogTitle>
+            <DialogDescription>
+              Та энэ захиалгыг цуцлахдаа итгэлтэй байна уу? Цуцлах код хэрэглэгчийн утас руу SMS-аар илгээгдэх болно.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <div className="space-y-2">
+              <p className="text-sm text-muted-foreground">
+                <strong>Захиалгын дугаар:</strong> #{order.id}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                <strong>Хэрэглэгч:</strong> {order.user?.name || 'N/A'}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                <strong>Утас:</strong> {order.user?.phoneNumber || 'N/A'}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                <strong>Нийт дүн:</strong> {formatPrice(order.totalAmount)}
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowConfirmRequestDialog(false)}
+              disabled={requestCancellationMutation.isPending}
+            >
+              Цуцлах
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleRequestCancellation}
+              disabled={requestCancellationMutation.isPending}
+            >
+              {requestCancellationMutation.isPending
+                ? 'Код илгээж байна...'
+                : 'Тийм, цуцлах'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Cancellation Code Confirmation Dialog */}
+      <Dialog open={showCancellationDialog} onOpenChange={setShowCancellationDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ShieldCheck className="h-5 w-5" />
+              Захиалга цуцлах баталгаажуулалт
+            </DialogTitle>
+            <DialogDescription>
+              Хэрэглэгчид SMS-аар илгээсэн 4 оронтой кодыг оруулна уу.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label htmlFor="cancellation-code" className="text-sm font-medium">
+                Баталгаажуулах код
+              </label>
+              <Input
+                id="cancellation-code"
+                type="text"
+                placeholder="1234"
+                value={cancellationCode}
+                onChange={(e) => {
+                  const value = e.target.value.replace(/\D/g, '').slice(0, 4);
+                  setCancellationCode(value);
+                }}
+                maxLength={4}
+                className="mt-2 text-center text-2xl tracking-widest"
+              />
+              <p className="text-xs text-muted-foreground mt-2">
+                Код 10 минутын дотор хүчинтэй
+              </p>
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowCancellationDialog(false);
+                  setCancellationCode('');
+                }}
+              >
+                Хаах
+              </Button>
+              <Button
+                onClick={handleConfirmCancellation}
+                disabled={
+                  cancellationCode.length !== 4 || confirmCancellationMutation.isPending
+                }
+                variant="destructive"
+              >
+                {confirmCancellationMutation.isPending
+                  ? 'Баталгаажуулж байна...'
+                  : 'Цуцлах'}
+              </Button>
+            </DialogFooter>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

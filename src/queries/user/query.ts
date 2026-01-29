@@ -1,6 +1,6 @@
 import adminFetchAndValidate from '@/lib/admin-fetcher';
 import { API_BASE_URL } from '@/lib/api-config';
-import { getStoredAuth, clearAuth, isTokenExpiredError } from '@/lib/auth-utils';
+import { getStoredAuth, clearAuth } from '@/lib/auth-utils';
 import type {
   User,
   UserDetail,
@@ -13,7 +13,7 @@ import {
 
 export interface UserSearchParams {
   search?: string;
-  role?: 'USER' | 'ADMIN';
+  role?: 'USER' | 'ADMIN' | 'SUPER_ADMIN';
   page?: number;
   limit?: number;
 }
@@ -54,24 +54,52 @@ export const getUsers = async (params?: UserSearchParams): Promise<{
     headers.Authorization = `Bearer ${token}`;
   }
 
-  const res = await fetch(url.toString(), {
-    headers,
-  });
+  // Create AbortController for timeout (10 seconds)
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+  let res: Response;
+  try {
+    res = await fetch(url.toString(), {
+      headers,
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+  } catch (error) {
+    clearTimeout(timeoutId);
+    
+    // Handle abort (timeout)
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error('Request timeout: The server took longer than 10s to respond.');
+    }
+    throw error;
+  }
+
+  // Check status code BEFORE parsing JSON to fail fast on 401
+  if (res.status === 401) {
+    clearAuth();
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('auth:cleared'));
+      window.location.href = '/login';
+    }
+    throw new Error('Your session has expired. Please log in again.');
+  }
+
   const json = await res.json();
 
   if (!res.ok) {
     const errorMessage = json.error?.message || json.message || `Request failed with status ${res.status}`;
-    
-    // Check if this is a token expiration/invalid token error
-    if (res.status === 401 || (token && (isTokenExpiredError(errorMessage) || isTokenExpiredError(json)))) {
-      // Clear auth data and redirect to login
+
+    // Handle 403 Forbidden as well
+    if (res.status === 403) {
       clearAuth();
       if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('auth:cleared'));
         window.location.href = '/login';
       }
-      throw new Error('Your session has expired. Please log in again.');
+      throw new Error('Access denied. Please log in again.');
     }
-    
+
     throw new Error(errorMessage);
   }
 
@@ -98,6 +126,25 @@ export const getUser = async (id: number): Promise<UserDetail> => {
   const response = await adminFetchAndValidate<UserResponse>(
     `/admin/users/${id}`,
     UserResponseSchema,
+  );
+  return response.data;
+};
+
+export interface UpdateUserRoleRequest {
+  role: 'USER' | 'ADMIN' | 'SUPER_ADMIN';
+}
+
+export const updateUserRole = async (
+  userId: number,
+  role: 'USER' | 'ADMIN' | 'SUPER_ADMIN',
+): Promise<User> => {
+  const response = await adminFetchAndValidate<UserResponse>(
+    `/admin/users/${userId}/role`,
+    UserResponseSchema,
+    {
+      method: 'POST',
+      body: { role },
+    },
   );
   return response.data;
 };

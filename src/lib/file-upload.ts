@@ -1,5 +1,5 @@
 import { API_BASE_URL } from './api-config';
-import { getStoredAuth, clearAuth, isTokenExpiredError } from './auth-utils';
+import { getStoredAuth, clearAuth } from './auth-utils';
 
 /**
  * Upload a single file to the server
@@ -73,16 +73,16 @@ export async function uploadFile(
 
   if (!response.ok) {
     const errorMessage = data.error?.message || data.message || 'Upload failed';
-    
-    // Check if this is a token expiration/invalid token error
-    if (response.status === 401 || isTokenExpiredError(errorMessage) || isTokenExpiredError(data)) {
+
+    // Only clear auth on 401 Unauthorized (error message text must not trigger logout)
+    if (response.status === 401) {
       clearAuth();
       if (typeof window !== 'undefined') {
         window.location.href = '/login';
       }
       throw new Error('Your session has expired. Please log in again.');
     }
-    
+
     throw new Error(errorMessage);
   }
 
@@ -169,6 +169,10 @@ export async function uploadFiles(
     // Don't set Content-Type - browser will set it with boundary for FormData
   };
 
+  // Create AbortController for timeout (60 seconds for file uploads)
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 60000);
+
   let response: Response;
   try {
     response = await fetch(`${API_BASE_URL}${endpoint}`, {
@@ -176,8 +180,17 @@ export async function uploadFiles(
       headers,
       body: formData,
       credentials: 'include',
+      signal: controller.signal,
     });
+    clearTimeout(timeoutId);
   } catch (error) {
+    clearTimeout(timeoutId);
+    
+    // Handle abort (timeout)
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error('Upload timeout: The server took longer than 60s to respond.');
+    }
+    
     if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
       throw new Error(
         `CORS Error: Unable to connect to the API server. ` +
@@ -185,6 +198,16 @@ export async function uploadFiles(
       );
     }
     throw error;
+  }
+
+  // Check status code BEFORE parsing JSON to fail fast on 401
+  if (response.status === 401) {
+    clearAuth();
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('auth:cleared'));
+      window.location.href = '/login';
+    }
+    throw new Error('Your session has expired. Please log in again.');
   }
 
   let data;
@@ -205,15 +228,16 @@ export async function uploadFiles(
   if (!response.ok) {
     const errorMessage = data.error?.message || data.message || 'Upload failed';
     
-    // Check if this is a token expiration/invalid token error
-    if (response.status === 401 || isTokenExpiredError(errorMessage) || isTokenExpiredError(data)) {
+    // Handle 403 Forbidden as well
+    if (response.status === 403) {
       clearAuth();
       if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('auth:cleared'));
         window.location.href = '/login';
       }
-      throw new Error('Your session has expired. Please log in again.');
+      throw new Error('Access denied. Please log in again.');
     }
-    
+
     throw new Error(errorMessage);
   }
 
@@ -340,15 +364,15 @@ export async function deleteImage(
   if (!response.ok) {
     const errorMessage = data.error?.message || data.message || 'Delete failed';
     
-    // Check if this is a token expiration/invalid token error
-    if (response.status === 401 || isTokenExpiredError(errorMessage) || isTokenExpiredError(data)) {
+    // Only clear auth on 401 Unauthorized
+    if (response.status === 401) {
       clearAuth();
       if (typeof window !== 'undefined') {
         window.location.href = '/login';
       }
       throw new Error('Your session has expired. Please log in again.');
     }
-    
+
     // If image not found (404), it might already be deleted, consider it success
     if (response.status === 404) {
       return true;

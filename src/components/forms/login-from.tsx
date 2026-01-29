@@ -50,8 +50,8 @@ export function LoginForm() {
     try {
       const response = await login(values);
 
-      // Check if user has admin role
-      if (response.data.user.role !== 'ADMIN') {
+      // Check if user has admin or super admin role
+      if (response.data.user.role !== 'ADMIN' && response.data.user.role !== 'SUPER_ADMIN') {
         toast.error('You do not have admin privileges to access the dashboard.');
         return;
       }

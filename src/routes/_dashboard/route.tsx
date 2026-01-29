@@ -15,7 +15,7 @@ export const Route = createFileRoute('/_dashboard')({
       });
     }
 
-    // Check if user has ADMIN role
+    // Check if user has ADMIN or SUPER_ADMIN role
     if (!isAdmin()) {
       throw redirect({
         to: '/login',

@@ -29,7 +29,12 @@ export function isAuthenticated(): boolean {
 
 export function isAdmin(): boolean {
   const { user } = getStoredAuth();
-  return user?.role === 'ADMIN';
+  return user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN';
+}
+
+export function isSuperAdmin(): boolean {
+  const { user } = getStoredAuth();
+  return user?.role === 'SUPER_ADMIN';
 }
 
 export function requireAdmin(): { token: string; user: User } {
@@ -39,8 +44,22 @@ export function requireAdmin(): { token: string; user: User } {
     throw new Error('Not authenticated');
   }
 
-  if (user.role !== 'ADMIN') {
+  if (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN') {
     throw new Error('Admin access required');
+  }
+
+  return { token, user };
+}
+
+export function requireSuperAdmin(): { token: string; user: User } {
+  const { token, user } = getStoredAuth();
+
+  if (!token || !user) {
+    throw new Error('Not authenticated');
+  }
+
+  if (user.role !== 'SUPER_ADMIN') {
+    throw new Error('Super admin access required');
   }
 
   return { token, user };

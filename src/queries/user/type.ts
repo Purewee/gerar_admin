@@ -53,7 +53,7 @@ export const UserSchema = z.object({
   phoneNumber: z.string(),
   email: z.string().nullable(),
   name: z.string(),
-  role: z.enum(['USER', 'ADMIN']),
+  role: z.enum(['USER', 'ADMIN', 'SUPER_ADMIN']),
   createdAt: z.string(),
   updatedAt: z.string(),
   _count: z.object({

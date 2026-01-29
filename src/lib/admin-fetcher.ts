@@ -1,12 +1,15 @@
 import type * as z from 'zod';
 import { API_BASE_URL } from './api-config';
-import { getStoredAuth, clearAuth, isTokenExpiredError } from './auth-utils';
+import { getStoredAuth, clearAuth } from './auth-utils';
 
 interface FetchOptions {
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
   body?: unknown;
   headers?: Record<string, string>;
+  timeout?: number; // Timeout in milliseconds, default 10000 (10 seconds)
 }
+
+const DEFAULT_TIMEOUT = 10000; // 10 seconds
 
 export default async function adminFetchAndValidate<T>(
   endpoint: string,
@@ -19,7 +22,7 @@ export default async function adminFetchAndValidate<T>(
     throw new Error('Authentication required');
   }
 
-  const { method = 'GET', body, headers = {} } = options;
+  const { method = 'GET', body, headers = {}, timeout = DEFAULT_TIMEOUT } = options;
 
   const requestHeaders: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -27,10 +30,15 @@ export default async function adminFetchAndValidate<T>(
     ...headers,
   };
 
+  // Create AbortController for timeout
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeout);
+
   const config: RequestInit = {
     method,
     headers: requestHeaders,
     credentials: 'include' as RequestCredentials,
+    signal: controller.signal,
   };
 
   if (body && method !== 'GET') {
@@ -40,7 +48,15 @@ export default async function adminFetchAndValidate<T>(
   let res: Response;
   try {
     res = await fetch(`${API_BASE_URL}${endpoint}`, config);
+    clearTimeout(timeoutId);
   } catch (error) {
+    clearTimeout(timeoutId);
+    
+    // Handle abort (timeout)
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error(`Request timeout: The server took longer than ${timeout}ms to respond.`);
+    }
+    
     // Handle network errors and CORS errors
     if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
       throw new Error(
@@ -49,6 +65,17 @@ export default async function adminFetchAndValidate<T>(
       );
     }
     throw error;
+  }
+
+  // Check status code BEFORE parsing JSON to fail fast on 401
+  if (res.status === 401) {
+    clearAuth();
+    // Dispatch custom event to notify AuthContext
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('auth:cleared'));
+      window.location.href = '/login';
+    }
+    throw new Error('Your session has expired. Please log in again.');
   }
 
   let json;
@@ -68,18 +95,17 @@ export default async function adminFetchAndValidate<T>(
 
   if (!res.ok) {
     const errorMessage = json.error?.message || json.message || `Request failed with status ${res.status}`;
-    
-    // Check if this is a token expiration/invalid token error
-    if (res.status === 401 || isTokenExpiredError(errorMessage) || isTokenExpiredError(json)) {
-      // Clear auth data and redirect to login
+
+    // Handle 403 Forbidden as well
+    if (res.status === 403) {
       clearAuth();
-      // Redirect to login page - the router will handle this on next navigation
       if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('auth:cleared'));
         window.location.href = '/login';
       }
-      throw new Error('Your session has expired. Please log in again.');
+      throw new Error('Access denied. Please log in again.');
     }
-    
+
     throw new Error(errorMessage);
   }
 

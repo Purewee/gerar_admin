@@ -17,7 +17,6 @@ import {
   getRevenueByProduct,
   getRevenueByCategory,
   getRevenueByCustomer,
-  getRevenueByPaymentMethod,
 } from '@/queries/analytics/query';
 import { formatPrice } from '@/lib/utils';
 import {
@@ -25,9 +24,6 @@ import {
   TrendingDown,
   DollarSign,
   ShoppingCart,
-  Package,
-  Users,
-  CreditCard,
   BarChart3,
 } from 'lucide-react';
 import { useState } from 'react';
@@ -112,7 +108,7 @@ function AnalyticsPage() {
   });
 
   // Revenue overview query
-  const { data: overviewData, isLoading: overviewLoading } = useQuery({
+  const { data: overviewData } = useQuery({
     queryKey: ['analytics', 'overview', dateRange],
     queryFn: () =>
       getRevenueOverview({
@@ -169,12 +165,6 @@ function AnalyticsPage() {
   const { data: customersData, isLoading: customersLoading } = useQuery({
     queryKey: ['analytics', 'customers'],
     queryFn: () => getRevenueByCustomer({ limit: 10 }),
-  });
-
-  // Payment methods query
-  const { data: paymentMethodsData, isLoading: paymentMethodsLoading } = useQuery({
-    queryKey: ['analytics', 'payment-methods'],
-    queryFn: () => getRevenueByPaymentMethod(),
   });
 
   const handleDateRangeSubmit = () => {
@@ -474,50 +464,6 @@ function AnalyticsPage() {
               </Table>
             ) : (
               <p className="text-sm text-muted-foreground">Хэрэглэгчийн өгөгдөл алга</p>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Payment Methods */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Төлбөрийн хэлбэрээр орлого</CardTitle>
-            <CardDescription>Төлбөрийн хэлбэрийн бүтэц</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {paymentMethodsLoading ? (
-              <Skeleton className="h-[300px] w-full" />
-            ) : paymentMethodsData && paymentMethodsData.paymentMethods.length > 0 ? (
-              <div className="space-y-4">
-                {paymentMethodsData.paymentMethods.map((method) => (
-                  <div key={method.paymentMethod} className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="font-medium">{method.paymentMethod}</span>
-                      <span className="text-sm text-muted-foreground">
-                        {method.percentage.toFixed(1)}%
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-4 text-sm">
-                      <span className="text-muted-foreground">
-                        {formatPrice(method.revenue)}
-                      </span>
-                      <span className="text-muted-foreground">
-                        {method.orderCount} захиалга
-                      </span>
-                    </div>
-                    <div className="h-2 bg-muted rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-primary"
-                        style={{ width: `${method.percentage}%` }}
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                Төлбөрийн хэлбэрийн өгөгдөл алга
-              </p>
             )}
           </CardContent>
         </Card>

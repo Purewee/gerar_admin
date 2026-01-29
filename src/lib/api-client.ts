@@ -1,18 +1,21 @@
 import { API_BASE_URL } from './api-config';
-import { clearAuth, isTokenExpiredError } from './auth-utils';
+import { clearAuth } from './auth-utils';
 
 export interface ApiRequestOptions {
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
   headers?: Record<string, string>;
   body?: unknown;
   token?: string | null;
+  timeout?: number; // Timeout in milliseconds, default 10000 (10 seconds)
 }
+
+const DEFAULT_TIMEOUT = 10000; // 10 seconds
 
 export async function apiRequest<T>(
   endpoint: string,
   options: ApiRequestOptions = {},
 ): Promise<T> {
-  const { method = 'GET', headers = {}, body, token } = options;
+  const { method = 'GET', headers = {}, body, token, timeout = DEFAULT_TIMEOUT } = options;
 
   const requestHeaders: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -23,10 +26,15 @@ export async function apiRequest<T>(
     requestHeaders['Authorization'] = `Bearer ${token}`;
   }
 
+  // Create AbortController for timeout
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeout);
+
   const config: RequestInit = {
     method,
     headers: requestHeaders,
     credentials: 'include' as RequestCredentials,
+    signal: controller.signal,
   };
 
   if (body && method !== 'GET') {
@@ -36,7 +44,15 @@ export async function apiRequest<T>(
   let response: Response;
   try {
     response = await fetch(`${API_BASE_URL}${endpoint}`, config);
+    clearTimeout(timeoutId);
   } catch (error) {
+    clearTimeout(timeoutId);
+    
+    // Handle abort (timeout)
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error(`Request timeout: The server took longer than ${timeout}ms to respond.`);
+    }
+    
     // Handle network errors and CORS errors
     if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
       throw new Error(
@@ -45,6 +61,17 @@ export async function apiRequest<T>(
       );
     }
     throw error;
+  }
+
+  // Check status code BEFORE parsing JSON to fail fast on 401
+  if (token && response.status === 401) {
+    clearAuth();
+    // Dispatch custom event to notify AuthContext
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('auth:cleared'));
+      window.location.href = '/login';
+    }
+    throw new Error('Your session has expired. Please log in again.');
   }
 
   let data;
@@ -65,18 +92,16 @@ export async function apiRequest<T>(
   if (!response.ok) {
     const errorMessage = data.error?.message || data.message || 'Request failed';
     
-    // Check if this is a token expiration/invalid token error
-    // Only handle token errors if a token was provided in the request
-    if (token && (response.status === 401 || isTokenExpiredError(errorMessage) || isTokenExpiredError(data))) {
-      // Clear auth data and redirect to login
+    // Handle 403 Forbidden as well
+    if (token && response.status === 403) {
       clearAuth();
-      // Redirect to login page - the router will handle this on next navigation
       if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('auth:cleared'));
         window.location.href = '/login';
       }
-      throw new Error('Your session has expired. Please log in again.');
+      throw new Error('Access denied. Please log in again.');
     }
-    
+
     throw new Error(errorMessage);
   }
 

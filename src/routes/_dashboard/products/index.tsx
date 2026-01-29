@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
-import { Plus, Edit, Trash2, Search, X, Filter, Image as ImageIcon, Info } from 'lucide-react';
+import { Plus, Edit, Trash2, Search, X, Filter, Image as ImageIcon, Info, Eye, EyeOff, RotateCcw } from 'lucide-react';
 import { useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -33,7 +33,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { fetchProductsOptions, useDeleteProduct } from '@/queries/product/options';
+import { fetchProductsOptions, useDeleteProduct, useHideProduct, useUnhideProduct, useRestoreProduct } from '@/queries/product/options';
 import { fetchCategoriesOptions } from '@/queries/category/options';
 import { toast } from 'sonner';
 import type { Product } from '@/queries/product/type';
@@ -54,6 +54,9 @@ function ProductsPage() {
   const navigate = useNavigate();
   const { data: categories = [] } = useQuery(fetchCategoriesOptions());
   const deleteProduct = useDeleteProduct();
+  const hideProduct = useHideProduct();
+  const unhideProduct = useUnhideProduct();
+  const restoreProduct = useRestoreProduct();
   const [deleteTarget, setDeleteTarget] = useState<Product | null>(null);
   const [showAdvancedSearch, setShowAdvancedSearch] = useState(false);
   
@@ -70,12 +73,16 @@ function ProductsPage() {
     createdBefore: '',
     sortBy: 'createdAt' as 'name' | 'price' | 'stock' | 'createdAt' | 'updatedAt',
     sortOrder: 'desc' as 'asc' | 'desc',
+    includeHidden: true as boolean,
+    includeDeleted: false as boolean,
   });
 
   // Active query params - these trigger the API call
   const [queryParams, setQueryParams] = useState<ProductSearchParams>({
     sortBy: 'createdAt',
     sortOrder: 'desc',
+    includeHidden: true,
+    includeDeleted: false,
   });
 
   // Function to apply search (copy form state to query params)
@@ -133,6 +140,14 @@ function ProductsPage() {
       params.createdBefore = formState.createdBefore.trim();
     }
     
+    if (formState.includeHidden !== undefined) {
+      params.includeHidden = formState.includeHidden;
+    }
+    
+    if (formState.includeDeleted !== undefined) {
+      params.includeDeleted = formState.includeDeleted;
+    }
+    
     setQueryParams(params);
   };
 
@@ -152,6 +167,39 @@ function ProductsPage() {
     }
   };
 
+  const handleHide = async (product: Product) => {
+    try {
+      await hideProduct.mutateAsync(product.id);
+      toast.success('Product hidden successfully');
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : 'Failed to hide product',
+      );
+    }
+  };
+
+  const handleUnhide = async (product: Product) => {
+    try {
+      await unhideProduct.mutateAsync(product.id);
+      toast.success('Product unhidden successfully');
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : 'Failed to unhide product',
+      );
+    }
+  };
+
+  const handleRestore = async (product: Product) => {
+    try {
+      await restoreProduct.mutateAsync(product.id);
+      toast.success('Product restored successfully');
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : 'Failed to restore product',
+      );
+    }
+  };
+
   const getStockBadge = (stock: number) => {
     if (stock === 0) {
       return <Badge variant="destructive">Дууссан</Badge>;
@@ -160,6 +208,20 @@ function ProductsPage() {
       return <Badge variant="secondary">Дуусаж байгаа</Badge>;
     }
     return <Badge variant="default">Үлдэгдэл</Badge>;
+  };
+
+  const formatDate = (dateString: string) => {
+    try {
+      return new Date(dateString).toLocaleDateString('mn-MN', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+    } catch {
+      return dateString;
+    }
   };
 
   const handleCategoryToggle = (categoryId: number) => {
@@ -185,10 +247,14 @@ function ProductsPage() {
       createdBefore: '',
       sortBy: 'createdAt',
       sortOrder: 'desc',
+      includeHidden: true,
+      includeDeleted: false,
     });
     setQueryParams({
       sortBy: 'createdAt',
       sortOrder: 'desc',
+      includeHidden: true,
+      includeDeleted: false,
     });
   };
 
@@ -204,7 +270,9 @@ function ProductsPage() {
       queryParams.createdAfter?.trim() ||
       queryParams.createdBefore?.trim() ||
       queryParams.sortBy !== 'createdAt' ||
-      queryParams.sortOrder !== 'desc'
+      queryParams.sortOrder !== 'desc' ||
+      queryParams.includeHidden !== true ||
+      queryParams.includeDeleted !== false
     );
   }, [queryParams]);
 
@@ -368,6 +436,44 @@ function ProductsPage() {
                         </div>
                       ))
                     )}
+                  </div>
+                </div>
+
+                {/* Include Hidden Products */}
+                <div className="space-y-2">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="includeHidden"
+                      checked={searchForm.includeHidden ?? true}
+                      onCheckedChange={(checked) =>
+                        setSearchForm(prev => ({ ...prev, includeHidden: checked === true }))
+                      }
+                    />
+                    <Label
+                      htmlFor="includeHidden"
+                      className="text-sm font-normal cursor-pointer"
+                    >
+                      Нуусан бараа харуулах
+                    </Label>
+                  </div>
+                </div>
+
+                {/* Include Deleted Products */}
+                <div className="space-y-2">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="includeDeleted"
+                      checked={searchForm.includeDeleted ?? false}
+                      onCheckedChange={(checked) =>
+                        setSearchForm(prev => ({ ...prev, includeDeleted: checked === true }))
+                      }
+                    />
+                    <Label
+                      htmlFor="includeDeleted"
+                      className="text-sm font-normal cursor-pointer"
+                    >
+                      Устгасан бараа харуулах
+                    </Label>
                   </div>
                 </div>
 
@@ -548,6 +654,17 @@ function ProductsPage() {
                       <TableCell className="font-medium">
                         <div className="flex items-center gap-2">
                           <span>{product.name}</span>
+                          {product.deletedAt && (
+                            <Badge variant="destructive" className="text-xs">
+                              Устгасан
+                            </Badge>
+                          )}
+                          {product.isHidden && !product.deletedAt && (
+                            <Badge variant="secondary" className="text-xs">
+                              <EyeOff className="mr-1 h-3 w-3" />
+                              Нуусан
+                            </Badge>
+                          )}
                           {(product.creator || product.updater) && (
                             <Tooltip>
                               <TooltipTrigger asChild>
@@ -559,14 +676,14 @@ function ProductsPage() {
                                     <div>
                                       <div className="font-semibold">Үүсгэсэн:</div>
                                       <div>{product.creator.name}</div>
-                                      <div className="text-muted-foreground">{product.creator.phoneNumber}</div>
+                                      <div className="text-muted-foreground">{formatDate(product.createdAt)}</div>
                                     </div>
                                   )}
                                   {product.updater && (
                                     <div className={product.creator ? 'mt-2 pt-2 border-t' : ''}>
                                       <div className="font-semibold">Шинэчлэсэн:</div>
                                       <div>{product.updater.name}</div>
-                                      <div className="text-muted-foreground">{product.updater.phoneNumber}</div>
+                                      <div className="text-muted-foreground">{formatDate(product.updatedAt)}</div>
                                     </div>
                                   )}
                                 </div>
@@ -633,25 +750,61 @@ function ProductsPage() {
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() =>
-                              navigate({
-                                to: '/products/$id/edit',
-                                params: { id: String(product.id) },
-                              })
-                            }
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setDeleteTarget(product)}
-                          >
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
+                          {product.deletedAt ? (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleRestore(product)}
+                              disabled={restoreProduct.isPending}
+                              title="Restore product"
+                              className="text-green-600 hover:text-green-700"
+                            >
+                              <RotateCcw className="h-4 w-4" />
+                            </Button>
+                          ) : (
+                            <>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() =>
+                                  navigate({
+                                    to: '/products/$id/edit',
+                                    params: { id: String(product.id) },
+                                  })
+                                }
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              {product.isHidden ? (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleUnhide(product)}
+                                  disabled={unhideProduct.isPending}
+                                  title="Unhide product"
+                                >
+                                  <EyeOff className="h-4 w-4" />
+                                </Button>
+                              ) : (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleHide(product)}
+                                  disabled={hideProduct.isPending}
+                                  title="Hide product"
+                                >
+                                  <Eye className="h-4 w-4" />
+                                </Button>
+                              )}
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setDeleteTarget(product)}
+                              >
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            </>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>
@@ -668,7 +821,10 @@ function ProductsPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Бараа устгах</AlertDialogTitle>
             <AlertDialogDescription>
-              Энэ барааг устгахдаа итгэлтэй байна уу "<strong>{deleteTarget?.name}</strong>"? Энэ үйлдлийг буцаах боломжгүй.
+              Энэ барааг устгахдаа итгэлтэй байна уу "<strong>{deleteTarget?.name}</strong>"? 
+              <br />
+              <br />
+              Бараа нь soft delete хийгдэж, захиалгын түүхэд хадгалагдана. Дараа нь сэргээх боломжтой.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

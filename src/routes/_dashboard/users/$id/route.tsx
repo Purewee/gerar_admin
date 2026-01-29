@@ -1,5 +1,6 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -12,10 +13,19 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Separator } from '@/components/ui/separator';
-import { fetchUserOptions } from '@/queries/user/options';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { fetchUserOptions, useUpdateUserRole } from '@/queries/user/options';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatPrice } from '@/lib/utils';
-import { ArrowLeft, MapPin, ShoppingCart, Package, Heart } from 'lucide-react';
+import { ArrowLeft, MapPin, ShoppingCart, Package, Heart, Shield } from 'lucide-react';
+import { useAuth } from '@/lib/auth-context';
+import { toast } from 'sonner';
 
 export const Route = createFileRoute('/_dashboard/users/$id')({
   component: UserDetailPage,
@@ -24,10 +34,88 @@ export const Route = createFileRoute('/_dashboard/users/$id')({
   },
 });
 
+interface RoleUpdateSectionProps {
+  currentRole: 'USER' | 'ADMIN' | 'SUPER_ADMIN';
+  userId: number;
+  selectedRole: 'USER' | 'ADMIN' | 'SUPER_ADMIN' | '';
+  setSelectedRole: (role: 'USER' | 'ADMIN' | 'SUPER_ADMIN' | '') => void;
+  onUpdateSuccess: () => void;
+  updateRoleMutation: ReturnType<typeof useUpdateUserRole>;
+}
+
+function RoleUpdateSection({
+  currentRole,
+  userId,
+  selectedRole,
+  setSelectedRole,
+  onUpdateSuccess,
+  updateRoleMutation,
+}: RoleUpdateSectionProps) {
+  const handleUpdateRole = async () => {
+    if (!selectedRole || selectedRole === currentRole) {
+      toast.error('Эрхийг сонгоно уу');
+      return;
+    }
+
+    try {
+      await updateRoleMutation.mutateAsync({
+        userId,
+        role: selectedRole as 'USER' | 'ADMIN' | 'SUPER_ADMIN',
+      });
+      toast.success('Эрх амжилттай шинэчлэгдлээ');
+      setSelectedRole('');
+      onUpdateSuccess();
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Эрх шинэчлэхэд алдаа гарлаа';
+      toast.error(errorMessage);
+    }
+  };
+
+  return (
+    <div className="space-y-3 p-4 border rounded-lg bg-muted/30">
+      <div className="flex items-center gap-2">
+        <Shield className="h-4 w-4 text-muted-foreground" />
+        <span className="text-sm font-medium">Эрх шинэчлэх (Супер Админ)</span>
+      </div>
+      <div className="flex gap-2">
+        <Select
+          value={selectedRole}
+          onValueChange={(value) => setSelectedRole(value as 'USER' | 'ADMIN' | 'SUPER_ADMIN')}
+        >
+          <SelectTrigger className="flex-1">
+            <SelectValue placeholder="Эрх сонгох" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="USER">Хэрэглэгч</SelectItem>
+            <SelectItem value="ADMIN">Админ</SelectItem>
+            <SelectItem value="SUPER_ADMIN">Супер Админ</SelectItem>
+          </SelectContent>
+        </Select>
+        <Button
+          onClick={handleUpdateRole}
+          disabled={!selectedRole || selectedRole === currentRole || updateRoleMutation.isPending}
+          size="sm"
+        >
+          {updateRoleMutation.isPending ? 'Хадгалж байна...' : 'Хадгалах'}
+        </Button>
+      </div>
+      {selectedRole && selectedRole !== currentRole && (
+        <p className="text-xs text-muted-foreground">
+          Эрх: {currentRole} → {selectedRole}
+        </p>
+      )}
+    </div>
+  );
+}
+
 function UserDetailPage() {
   const { userId } = Route.useLoaderData();
   const navigate = useNavigate();
   const { data: user, isLoading } = useQuery(fetchUserOptions(userId));
+  const updateRoleMutation = useUpdateUserRole();
+  const [selectedRole, setSelectedRole] = useState<'USER' | 'ADMIN' | 'SUPER_ADMIN' | ''>('');
+  const { user: currentUser } = useAuth();
+  const canUpdateRole = currentUser?.role === 'SUPER_ADMIN';
 
   const formatDate = (dateString: string) => {
     try {
@@ -48,6 +136,7 @@ function UserDetailPage() {
       PENDING: { label: 'Хүлээгдэж байна', variant: 'secondary' },
       COMPLETED: { label: 'Дууссан', variant: 'default' },
       CANCELLED: { label: 'Цуцлагдсан', variant: 'destructive' },
+      CANCELLED_BY_ADMIN: { label: 'Цуцлагдсан (админ баталгаажуулсан)', variant: 'destructive' },
       PROCESSING: { label: 'Боловсруулж байна', variant: 'outline' },
     };
 
@@ -61,6 +150,9 @@ function UserDetailPage() {
   };
 
   const getRoleBadge = (role: string) => {
+    if (role === 'SUPER_ADMIN') {
+      return <Badge variant="default" className="bg-purple-600">Супер Админ</Badge>;
+    }
     if (role === 'ADMIN') {
       return <Badge variant="default">Админ</Badge>;
     }
@@ -216,6 +308,27 @@ function UserDetailPage() {
               <div className="mt-1">{getRoleBadge(user.role)}</div>
             </div>
             <Separator />
+            {canUpdateRole ? (
+              <div className="pt-2">
+                <RoleUpdateSection
+                  currentRole={user.role}
+                  userId={userId}
+                  selectedRole={selectedRole}
+                  setSelectedRole={setSelectedRole}
+                  onUpdateSuccess={() => {
+                    // Refetch user data
+                    window.location.reload();
+                  }}
+                  updateRoleMutation={updateRoleMutation}
+                />
+              </div>
+            ) : (
+              currentUser && currentUser.role !== 'SUPER_ADMIN' && (
+                <div className="pt-2 text-xs text-muted-foreground">
+                  Зөвхөн Супер Админ эрхтэй хэрэглэгч эрх шинэчлэх боломжтой
+                </div>
+              )
+            )}
             <div>
               <span className="text-sm font-medium text-muted-foreground">Бүртгэсэн огноо:</span>
               <p className="text-sm">{formatDate(user.createdAt)}</p>

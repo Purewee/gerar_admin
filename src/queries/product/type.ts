@@ -26,6 +26,8 @@ export const ProductSchema = z.object({
   updatedBy: z.number().nullable().optional(),
   creator: AdminUserSchema.nullable().optional(),
   updater: AdminUserSchema.nullable().optional(),
+  isHidden: z.boolean().optional(),
+  deletedAt: z.string().nullable().optional(),
 }).passthrough(); // Allow additional fields that might be in the API response
 
 export const CreateProductSchema = z.object({
@@ -55,6 +57,7 @@ export const UpdateProductSchema = z.object({
     z.array(z.object({ categoryId: z.number(), order: z.number() })), // Array format: [{categoryId: 1, order: 0}]
   ]).optional(),
   images: z.array(z.string().url('Each image must be a valid URL')).nullable().optional(),
+  isHidden: z.boolean().optional(),
 });
 
 export const ProductResponseSchema = z.object({

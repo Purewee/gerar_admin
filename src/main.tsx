@@ -21,7 +21,44 @@ if (!rootElement) {
   throw new Error('Root element not found');
 }
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      // Don't retry on authentication errors
+      retry: (failureCount, error) => {
+        // Don't retry on 401/403 errors
+        if (error instanceof Error) {
+          const message = error.message.toLowerCase();
+          if (message.includes('session has expired') || 
+              message.includes('access denied') ||
+              message.includes('authentication required')) {
+            return false;
+          }
+        }
+        // Retry up to 2 times for other errors
+        return failureCount < 2;
+      },
+      // Reduce stale time to detect expired sessions faster
+      staleTime: 0,
+      // Don't cache failed queries
+      gcTime: 0,
+    },
+    mutations: {
+      // Don't retry mutations on auth errors
+      retry: (failureCount, error) => {
+        if (error instanceof Error) {
+          const message = error.message.toLowerCase();
+          if (message.includes('session has expired') || 
+              message.includes('access denied') ||
+              message.includes('authentication required')) {
+            return false;
+          }
+        }
+        return failureCount < 1;
+      },
+    },
+  },
+});
 
 if (!rootElement.innerHTML) {
   const root = ReactDOM.createRoot(rootElement);

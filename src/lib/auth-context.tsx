@@ -27,6 +27,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setToken(storedToken);
       setUser(storedUser);
     }
+
+    // Listen for auth cleared events (from API errors)
+    const handleAuthCleared = () => {
+      setUser(null);
+      setToken(null);
+    };
+
+    window.addEventListener('auth:cleared', handleAuthCleared);
+
+    return () => {
+      window.removeEventListener('auth:cleared', handleAuthCleared);
+    };
   }, []);
 
   const login = (newUser: User, newToken: string) => {

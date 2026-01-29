@@ -35,7 +35,7 @@ function UsersPage() {
   // Search form state - user inputs (doesn't trigger search)
   const [searchForm, setSearchForm] = useState({
     search: '',
-    role: undefined as 'USER' | 'ADMIN' | undefined,
+    role: undefined as 'USER' | 'ADMIN' | 'SUPER_ADMIN' | undefined,
     page: 1,
     limit: 50,
   });
@@ -99,6 +99,9 @@ function UsersPage() {
   }, [queryParams]);
 
   const getRoleBadge = (role: string) => {
+    if (role === 'SUPER_ADMIN') {
+      return <Badge variant="default" className="bg-purple-600">Супер Админ</Badge>;
+    }
     if (role === 'ADMIN') {
       return <Badge variant="default">Админ</Badge>;
     }
@@ -162,7 +165,7 @@ function UsersPage() {
                   onValueChange={(value) =>
                     setSearchForm((prev) => ({
                       ...prev,
-                      role: value === 'all' ? undefined : (value as 'USER' | 'ADMIN'),
+                      role: value === 'all' ? undefined : (value as 'USER' | 'ADMIN' | 'SUPER_ADMIN'),
                     }))
                   }
                 >
@@ -173,6 +176,7 @@ function UsersPage() {
                     <SelectItem value="all">Бүх эрх</SelectItem>
                     <SelectItem value="USER">Хэрэглэгч</SelectItem>
                     <SelectItem value="ADMIN">Админ</SelectItem>
+                    <SelectItem value="SUPER_ADMIN">Супер Админ</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

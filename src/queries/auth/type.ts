@@ -4,7 +4,7 @@ export const UserSchema = z.object({
   id: z.number(),
   phoneNumber: z.string(),
   name: z.string(),
-  role: z.enum(['USER', 'ADMIN']),
+  role: z.enum(['USER', 'ADMIN', 'SUPER_ADMIN']),
   createdAt: z.string(),
   updatedAt: z.string(),
 });

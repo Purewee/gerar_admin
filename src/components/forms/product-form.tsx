@@ -696,7 +696,7 @@ export function ProductForm({
                 return (
                   <FormItem>
                     <FormLabel className="text-base font-semibold">
-                      <span className="text-muted-foreground">Анхны үнэ (Хөнгөлөлтөөс өмнө)</span>
+                      <span className="text-muted-foreground">Анхны үнэ (Хөнгөлөлтөөс өмнө) заавал биш</span>
                     </FormLabel>
                     <FormControl>
                       <div className="relative">
