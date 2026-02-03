@@ -25,7 +25,10 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 
+const TITLE = 'Тогтмол утгууд | Gerar';
+
 export const Route = createFileRoute('/_dashboard/constants')({
+  head: () => ({ meta: [{ title: TITLE }] }),
   component: ConstantsPage,
 });
 

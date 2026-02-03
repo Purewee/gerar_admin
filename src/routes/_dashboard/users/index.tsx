@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
-import { Search, Eye, User as UserIcon } from 'lucide-react';
+import { Search, Eye, User as UserIcon, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -25,7 +25,10 @@ import { fetchUsersOptions } from '@/queries/user/options';
 import type { UserSearchParams } from '@/queries/user/query';
 import { Skeleton } from '@/components/ui/skeleton';
 
+const TITLE = 'Хэрэглэгчид | Gerar';
+
 export const Route = createFileRoute('/_dashboard/users/')({
+  head: () => ({ meta: [{ title: TITLE }] }),
   component: UsersPage,
 });
 
@@ -299,9 +302,31 @@ function UsersPage() {
 
           {/* Pagination */}
           {pagination && pagination.totalPages > 1 && (
-            <div className="flex items-center justify-between mt-4">
-              <div className="text-sm text-muted-foreground">
-                Хуудас {pagination.page} / {pagination.totalPages}
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-4 border-t pt-4">
+              <div className="flex items-center gap-4">
+                <p className="text-muted-foreground text-sm">
+                  Хуудас {pagination.page} / {pagination.totalPages} (нийт {pagination.total} хэрэглэгч)
+                </p>
+                <Select
+                  value={String(pagination.limit)}
+                  onValueChange={(v) => {
+                    const newLimit = Number(v);
+                    setSearchForm((prev) => ({ ...prev, limit: newLimit, page: 1 }));
+                    setQueryParams((prev) => ({ ...prev, limit: newLimit, page: 1 }));
+                  }}
+                >
+                  <SelectTrigger className="w-20 h-8 text-sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {[10, 20, 50, 100].map((n) => (
+                      <SelectItem key={n} value={String(n)}>
+                        {n}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <span className="text-muted-foreground text-sm">/ хуудас</span>
               </div>
               <div className="flex gap-2">
                 <Button
@@ -314,6 +339,7 @@ function UsersPage() {
                     setQueryParams((prev) => ({ ...prev, page: newPage }));
                   }}
                 >
+                  <ChevronLeft className="h-4 w-4" />
                   Өмнөх
                 </Button>
                 <Button
@@ -327,6 +353,7 @@ function UsersPage() {
                   }}
                 >
                   Дараах
+                  <ChevronRight className="h-4 w-4" />
                 </Button>
               </div>
             </div>

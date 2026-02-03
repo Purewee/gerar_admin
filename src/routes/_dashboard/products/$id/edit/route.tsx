@@ -11,7 +11,10 @@ import {
 } from '@/queries/product/options';
 import { toast } from 'sonner';
 
+const TITLE = 'Бүтээгдэхүүн засах | Gerar';
+
 export const Route = createFileRoute('/_dashboard/products/$id/edit')({
+  head: () => ({ meta: [{ title: TITLE }] }),
   component: EditProductPage,
   loader: ({ params }) => {
     return { productId: Number(params.id) };
@@ -80,6 +83,8 @@ function EditProductPage() {
               categoryId: product.categoryId || undefined,
               categoryIds: product.categories?.map(cat => cat.id) || (product.categoryId ? [product.categoryId] : []),
               images: product.images || [],
+              classificationCode: product.classificationCode ?? null,
+              vatAmount: product.vatAmount != null ? Number(product.vatAmount) : null,
             }}
             onSubmit={handleSubmit}
             isLoading={updateProduct.isPending}

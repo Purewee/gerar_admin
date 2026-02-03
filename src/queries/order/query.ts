@@ -1,6 +1,6 @@
 import adminFetchAndValidate from '@/lib/admin-fetcher';
-import type { Order, OrderSearchFilters, SearchOrdersResult } from './type';
-import { OrdersResponseSchema, OrderSchema, SearchOrdersResponseSchema } from './type';
+import type { Order, OrderSearchFilters, SearchOrdersResult, OrderTimelineEvent } from './type';
+import { OrdersResponseSchema, OrderSchema, SearchOrdersResponseSchema, OrderTimelineResponseSchema, OrderEbarimtResponseSchema } from './type';
 import { z } from 'zod';
 
 const OrderResponseSchema = z.object({
@@ -58,10 +58,65 @@ export const searchOrders = async (filters: OrderSearchFilters): Promise<SearchO
   };
 };
 
-export const getOrder = async (id: number): Promise<Order> => {
+const PER_SIMPLE_LIMIT = 50;
+
+/**
+ * Simple search: one term matches orderId OR phone OR name.
+ * Backend typically ANDs those params, so we run 3 requests and merge by order id.
+ */
+export const searchOrdersSimple = async (
+  term: string,
+  baseFilters: OrderSearchFilters,
+): Promise<SearchOrdersResult> => {
+  const base = {
+    ...baseFilters,
+    orderId: '',
+    phone: '',
+    name: '',
+    page: 1,
+    limit: PER_SIMPLE_LIMIT,
+  };
+  const [byOrderId, byPhone, byName] = await Promise.all([
+    searchOrders({ ...base, orderId: term }),
+    searchOrders({ ...base, phone: term }),
+    searchOrders({ ...base, name: term }),
+  ]);
+  const byId = new Map<string, Order>();
+  for (const o of byOrderId.orders) byId.set(o.id, o);
+  for (const o of byPhone.orders) byId.set(o.id, o);
+  for (const o of byName.orders) byId.set(o.id, o);
+  const orders = Array.from(byId.values());
+  return {
+    orders,
+    total: orders.length,
+    page: 1,
+    limit: orders.length,
+    totalPages: 1,
+  };
+};
+
+export const getOrder = async (id: string): Promise<Order> => {
   const response = await adminFetchAndValidate(
     `/admin/orders/${id}`,
     OrderResponseSchema,
+  );
+  return response.data;
+};
+
+/** Get order timeline (events sorted by createdAt ascending). */
+export const getOrderTimeline = async (orderId: string): Promise<OrderTimelineEvent[]> => {
+  const response = await adminFetchAndValidate(
+    `/admin/orders/${orderId}/timeline`,
+    OrderTimelineResponseSchema,
+  );
+  return response.data;
+};
+
+/** Get ebarimt (receipt) info for printing – opens receiptUrl in new window when present. */
+export const getOrderEbarimt = async (orderId: string) => {
+  const response = await adminFetchAndValidate(
+    `/admin/orders/${orderId}/ebarimt`,
+    OrderEbarimtResponseSchema,
   );
   return response.data;
 };
@@ -82,7 +137,7 @@ const CancellationRequestResponseSchema = z.union([
 ]);
 
 // Request cancellation - generates code and sends SMS
-export const requestCancellation = async (orderId: number): Promise<{ message: string }> => {
+export const requestCancellation = async (orderId: string): Promise<{ message: string }> => {
   try {
     const response = await adminFetchAndValidate(
       `/admin/orders/${orderId}/request-cancellation`,
@@ -134,7 +189,7 @@ export const requestCancellation = async (orderId: number): Promise<{ message: s
 
 // Confirm cancellation - validates code and cancels order
 export const confirmCancellation = async (
-  orderId: number,
+  orderId: string,
   code: string,
 ): Promise<Order> => {
   const response = await adminFetchAndValidate(
@@ -150,7 +205,7 @@ export const confirmCancellation = async (
 
 // Update order status
 export const updateOrderStatus = async (
-  orderId: number,
+  orderId: string,
   status: string,
 ): Promise<Order> => {
   const response = await adminFetchAndValidate(

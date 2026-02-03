@@ -1,6 +1,7 @@
 import { Outlet } from '@tanstack/react-router';
 import { TanStackRouterDevtools } from '@tanstack/react-router-devtools';
 import { AppSidebar } from '@/components/nav/app-sidebar';
+import { MobileBottomNav } from '@/components/nav/mobile-bottom-nav';
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
 import { AppHeader } from '../nav/app-header';
 
@@ -17,12 +18,13 @@ export function DashboardLayout() {
       <AppSidebar variant="inset" />
       <SidebarInset>
         <AppHeader />
-        <div className="flex flex-1 flex-col">
+        <div className="flex flex-1 flex-col pb-14 md:pb-0">
           <div className="@container/main flex flex-1 flex-col gap-2 p-4">
             <Outlet />
           </div>
         </div>
       </SidebarInset>
+      <MobileBottomNav />
       <TanStackRouterDevtools position="bottom-right" />
     </SidebarProvider>
   );

@@ -5,9 +5,11 @@ import type {
   CreateProductRequest,
   UpdateProductRequest,
   Product,
+  ProductsListResult,
 } from './type';
 import {
   ProductResponseSchema,
+  PaginationSchema,
 } from './type';
 
 export interface ProductSearchParams {
@@ -29,7 +31,7 @@ export interface ProductSearchParams {
   includeDeleted?: boolean;
 }
 
-export const getProducts = async (params?: ProductSearchParams): Promise<Product[]> => {
+export const getProducts = async (params?: ProductSearchParams): Promise<ProductsListResult> => {
   const { token } = getStoredAuth();
   
   // Use admin endpoint for advanced search with filters
@@ -145,14 +147,24 @@ export const getProducts = async (params?: ProductSearchParams): Promise<Product
     throw new Error(errorMessage);
   }
 
-  // Handle response format - could be wrapped or direct array
-  if (Array.isArray(json)) {
-    return json;
+  // Handle response format - with pagination (admin API) or plain array
+  const products: Product[] = Array.isArray(json)
+    ? json
+    : json.data && Array.isArray(json.data)
+      ? json.data
+      : [];
+
+  if (products.length === 0 && !Array.isArray(json) && !json.data) {
+    throw new Error('Invalid API response format');
   }
-  if (json.success && json.data) {
-    return json.data;
-  }
-  throw new Error('Invalid API response format');
+
+  const paginationRaw = typeof json === 'object' && json !== null && 'pagination' in json ? json.pagination : null;
+  const parsed = paginationRaw ? PaginationSchema.safeParse(paginationRaw) : null;
+  const pagination = parsed?.success
+    ? parsed.data
+    : { total: products.length, page: 1, limit: products.length || 50, totalPages: 1 };
+
+  return { products, pagination };
 };
 
 export const getProduct = async (id: number): Promise<Product> => {

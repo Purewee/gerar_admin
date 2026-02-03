@@ -6,7 +6,10 @@ import { fetchCategoriesOptions } from '@/queries/category/options';
 import { useCreateProduct } from '@/queries/product/options';
 import { toast } from 'sonner';
 
+const TITLE = 'Шинэ бүтээгдэхүүн | Gerar';
+
 export const Route = createFileRoute('/_dashboard/products/new')({
+  head: () => ({ meta: [{ title: TITLE }] }),
   component: NewProductPage,
 });
 

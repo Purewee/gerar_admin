@@ -21,7 +21,7 @@ To get started with this boilerplate, you need to have [pnpm](https://pnpm.io/) 
 1.  **Clone the repository:**
 
     ```bash
-    git clone https://github.com/tanasoft1/react_boiler.git
+    git clone https://github.com/Gerar1/react_boiler.git
     ```
 
 2.  **Install dependencies:**

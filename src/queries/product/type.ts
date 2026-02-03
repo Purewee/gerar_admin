@@ -28,6 +28,8 @@ export const ProductSchema = z.object({
   updater: AdminUserSchema.nullable().optional(),
   isHidden: z.boolean().optional(),
   deletedAt: z.string().nullable().optional(),
+  classificationCode: z.string().nullable().optional(),
+  vatAmount: z.union([z.number(), z.string()]).nullable().optional(),
 }).passthrough(); // Allow additional fields that might be in the API response
 
 export const CreateProductSchema = z.object({
@@ -39,6 +41,8 @@ export const CreateProductSchema = z.object({
   categoryId: z.number().int().positive('Category is required').optional(),
   categoryIds: z.array(z.number().int().positive()).min(1, 'At least one category is required').optional(),
   images: z.array(z.string().url('Each image must be a valid URL')).optional(),
+  classificationCode: z.string().max(50).nullable().optional(),
+  vatAmount: z.number().nullable().optional(),
 }).refine((data) => data.categoryId || (data.categoryIds && data.categoryIds.length > 0), {
   message: 'At least one category is required',
   path: ['categoryIds'],
@@ -58,6 +62,8 @@ export const UpdateProductSchema = z.object({
   ]).optional(),
   images: z.array(z.string().url('Each image must be a valid URL')).nullable().optional(),
   isHidden: z.boolean().optional(),
+  classificationCode: z.string().max(50).nullable().optional(),
+  vatAmount: z.number().nullable().optional(),
 });
 
 export const ProductResponseSchema = z.object({
@@ -72,8 +78,28 @@ export const ProductsResponseSchema = z.object({
   data: z.array(ProductSchema),
 });
 
+export const PaginationSchema = z.object({
+  total: z.number(),
+  page: z.number(),
+  limit: z.number(),
+  totalPages: z.number(),
+});
+
+export const ProductsListResponseSchema = z.object({
+  success: z.boolean().optional(),
+  data: z.array(ProductSchema),
+  pagination: PaginationSchema,
+}).or(z.object({
+  success: z.boolean().optional(),
+  data: z.array(ProductSchema),
+}));
+
 export type Product = z.infer<typeof ProductSchema>;
 export type CreateProductRequest = z.infer<typeof CreateProductSchema>;
 export type UpdateProductRequest = z.infer<typeof UpdateProductSchema>;
 export type ProductResponse = z.infer<typeof ProductResponseSchema>;
 export type ProductsResponse = z.infer<typeof ProductsResponseSchema>;
+export type ProductsListResult = {
+  products: Product[];
+  pagination: { total: number; page: number; limit: number; totalPages: number };
+};

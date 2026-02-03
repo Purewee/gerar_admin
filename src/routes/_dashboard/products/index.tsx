@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
-import { Plus, Edit, Trash2, Search, X, Filter, Image as ImageIcon, Info, Eye, EyeOff, RotateCcw } from 'lucide-react';
+import { Plus, Edit, Trash2, Search, X, Filter, Image as ImageIcon, Info, Eye, EyeOff, RotateCcw, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -46,7 +46,10 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 
+const TITLE = 'Бүтээгдэхүүн | Gerar';
+
 export const Route = createFileRoute('/_dashboard/products/')({
+  head: () => ({ meta: [{ title: TITLE }] }),
   component: ProductsPage,
 });
 
@@ -75,6 +78,8 @@ function ProductsPage() {
     sortOrder: 'desc' as 'asc' | 'desc',
     includeHidden: true as boolean,
     includeDeleted: false as boolean,
+    page: 1,
+    limit: 20,
   });
 
   // Active query params - these trigger the API call
@@ -83,75 +88,82 @@ function ProductsPage() {
     sortOrder: 'desc',
     includeHidden: true,
     includeDeleted: false,
+    page: 1,
+    limit: 20,
   });
 
-  // Function to apply search (copy form state to query params)
+  // Function to apply search (copy form state to query params, reset to page 1)
   const applySearch = (formState = searchForm) => {
     const params: ProductSearchParams = {
       sortBy: formState.sortBy || 'createdAt',
       sortOrder: formState.sortOrder || 'desc',
+      page: 1,
+      limit: formState.limit ?? 20,
     };
-    
+
     if (formState.search?.trim()) {
       params.search = formState.search.trim();
     }
-    
+
     if (formState.categoryIds && formState.categoryIds.length > 0) {
       params.categoryIds = formState.categoryIds;
     }
-    
+
     if (formState.inStock !== undefined) {
       params.inStock = formState.inStock;
     }
-    
+
     if (formState.minPrice !== '' && formState.minPrice !== undefined) {
       const num = Number(formState.minPrice);
       if (!isNaN(num)) {
         params.minPrice = num;
       }
     }
-    
+
     if (formState.maxPrice !== '' && formState.maxPrice !== undefined) {
       const num = Number(formState.maxPrice);
       if (!isNaN(num)) {
         params.maxPrice = num;
       }
     }
-    
+
     if (formState.minStock !== '' && formState.minStock !== undefined) {
       const num = Number(formState.minStock);
       if (!isNaN(num)) {
         params.minStock = num;
       }
     }
-    
+
     if (formState.maxStock !== '' && formState.maxStock !== undefined) {
       const num = Number(formState.maxStock);
       if (!isNaN(num)) {
         params.maxStock = num;
       }
     }
-    
+
     if (formState.createdAfter?.trim()) {
       params.createdAfter = formState.createdAfter.trim();
     }
-    
+
     if (formState.createdBefore?.trim()) {
       params.createdBefore = formState.createdBefore.trim();
     }
-    
+
     if (formState.includeHidden !== undefined) {
       params.includeHidden = formState.includeHidden;
     }
-    
+
     if (formState.includeDeleted !== undefined) {
       params.includeDeleted = formState.includeDeleted;
     }
-    
+
+    setSearchForm((prev) => ({ ...prev, page: 1 }));
     setQueryParams(params);
   };
 
-  const { data: products = [], isLoading } = useQuery(fetchProductsOptions(queryParams));
+  const { data, isLoading } = useQuery(fetchProductsOptions(queryParams));
+  const products = data?.products ?? [];
+  const pagination = data?.pagination;
 
   const handleDelete = async () => {
     if (!deleteTarget) return;
@@ -249,13 +261,27 @@ function ProductsPage() {
       sortOrder: 'desc',
       includeHidden: true,
       includeDeleted: false,
+      page: 1,
+      limit: 20,
     });
     setQueryParams({
       sortBy: 'createdAt',
       sortOrder: 'desc',
       includeHidden: true,
       includeDeleted: false,
+      page: 1,
+      limit: 20,
     });
+  };
+
+  const handlePageChange = (newPage: number) => {
+    setSearchForm((prev) => ({ ...prev, page: newPage }));
+    setQueryParams((prev) => ({ ...prev, page: newPage }));
+  };
+
+  const handleLimitChange = (newLimit: number) => {
+    setSearchForm((prev) => ({ ...prev, limit: newLimit, page: 1 }));
+    setQueryParams((prev) => ({ ...prev, limit: newLimit, page: 1 }));
   };
 
   const hasActiveFilters = useMemo(() => {
@@ -606,7 +632,9 @@ function ProductsPage() {
         <CardHeader>
           <CardTitle>Бүх бараанууд</CardTitle>
           <CardDescription>
-            {products.length} {products.length === 1 ? 'бараа' : 'бараа'} нийт
+            {pagination
+              ? `Нийт: ${pagination.total} бараа (Хуудас: ${pagination.page}/${pagination.totalPages})`
+              : 'Бараануудыг ачаалж байна...'}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -812,6 +840,53 @@ function ProductsPage() {
                 })}
               </TableBody>
             </Table>
+          )}
+
+          {/* Pagination */}
+          {pagination && pagination.totalPages > 1 && (
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-4 border-t pt-4">
+              <div className="flex items-center gap-4">
+                <p className="text-muted-foreground text-sm">
+                  Хуудас {pagination.page} / {pagination.totalPages} (нийт {pagination.total} бараа)
+                </p>
+                <Select
+                  value={String(pagination.limit)}
+                  onValueChange={(v) => handleLimitChange(Number(v))}
+                >
+                  <SelectTrigger className="w-20 h-8 text-sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {[10, 20, 50].map((n) => (
+                      <SelectItem key={n} value={String(n)}>
+                        {n}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <span className="text-muted-foreground text-sm">/ хуудас</span>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handlePageChange(Math.max(1, pagination.page - 1))}
+                  disabled={pagination.page <= 1}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                  Өмнөх
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handlePageChange(Math.min(pagination.totalPages, pagination.page + 1))}
+                  disabled={pagination.page >= pagination.totalPages}
+                >
+                  Дараах
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
           )}
         </CardContent>
       </Card>

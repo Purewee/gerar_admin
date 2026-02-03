@@ -19,7 +19,10 @@ const ORDER_STATUS_LABELS: Record<string, string> = {
   'Хүргэгдсэн': 'Хүргэгдсэн',
 };
 
+const TITLE = 'Самбар | Gerar';
+
 export const Route = createFileRoute('/_dashboard/')({
+  head: () => ({ meta: [{ title: TITLE }] }),
   component: DashboardHome,
 });
 
@@ -62,9 +65,10 @@ function DashboardHome() {
   const { data: categories = [], isLoading: categoriesLoading } = useQuery(
     fetchCategoriesOptions(),
   );
-  const { data: products = [], isLoading: productsLoading } = useQuery(
+  const { data: productsData, isLoading: productsLoading } = useQuery(
     fetchProductsOptions(),
   );
+  const products = productsData?.products ?? [];
   const { data: orders = [], isLoading: ordersLoading } = useQuery(
     fetchOrdersOptions(),
   );
@@ -151,7 +155,7 @@ function DashboardHome() {
                     <div>
                       <p className="font-medium">Захиалгын дугаар #{order.id}</p>
                       <p className="text-sm text-muted-foreground">
-                        {order.user?.name || 'Unknown'} •{' '}
+                        {order.user?.name ?? order.contactFullName ?? 'Unknown'} •{' '}
                         {new Date(order.createdAt).toLocaleDateString()}
                       </p>
                     </div>

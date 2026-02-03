@@ -9,7 +9,10 @@ import {
 } from '@/queries/category/options';
 import { toast } from 'sonner';
 
+const TITLE = 'Ангилал засах | Gerar';
+
 export const Route = createFileRoute('/_dashboard/categories/$id/edit')({
+  head: () => ({ meta: [{ title: TITLE }] }),
   component: EditCategoryPage,
   loader: ({ params }) => {
     return { categoryId: Number(params.id) };

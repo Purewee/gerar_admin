@@ -35,7 +35,10 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { formatPrice } from '@/lib/utils';
 import type { Product } from '@/queries/product/type';
 
+const TITLE = 'Барааны дараалал | Gerar';
+
 export const Route = createFileRoute('/_dashboard/products/order')({
+  head: () => ({ meta: [{ title: TITLE }] }),
   component: ProductOrderPage,
 });
 
@@ -133,7 +136,7 @@ function ProductOrderPage() {
   const updateProduct = useUpdateProduct();
 
   // Fetch products for selected category (without sortBy to get natural order)
-  const { data: fetchedProducts = [], isLoading } = useQuery({
+  const { data: productsResult, isLoading } = useQuery({
     ...fetchProductsOptions({
       categoryId: selectedCategoryId || undefined,
       limit: 1000, // Get all products in category
@@ -141,8 +144,10 @@ function ProductOrderPage() {
     enabled: !!selectedCategoryId,
   });
 
+  const fetchedProducts = productsResult?.products ?? [];
+
   // Create a stable string of product IDs for dependency tracking (outside useEffect)
-  const productIdsString = fetchedProducts.map(p => p.id).sort().join(',');
+  const productIdsString = fetchedProducts.map((p) => p.id).sort().join(',');
 
   // Update local products when fetched products change or category changes
   useEffect(() => {

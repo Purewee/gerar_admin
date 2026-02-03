@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
-import { Eye, XCircle, Truck, PackageCheck, Loader2, Search, ChevronDown, ChevronUp, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Eye, XCircle, Truck, PackageCheck, Loader2, Search, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, LayoutList, Clock, CreditCard, Printer } from 'lucide-react';
 import { useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -33,10 +33,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { fetchOrdersOptions, fetchOrdersSearchOptions, useUpdateOrderStatus } from '@/queries/order/options';
+import { fetchOrdersSearchOptions, useUpdateOrderStatus } from '@/queries/order/options';
+import { getOrderEbarimt } from '@/queries/order/query';
+import { USE_MOCK_EBARIMT, MOCK_EBARIMT } from '@/queries/order/mock-ebarimt';
 import { Skeleton } from '@/components/ui/skeleton';
-import type { Order, OrderSearchFilters } from '@/queries/order/type';
-import { STATUS_DELIVERY_STARTED, STATUS_CANCELLED_BY_ADMIN, isOrderCancelled } from '@/queries/order/type';
+import { EbarimtReceiptDialog } from '@/components/ebarimt-receipt-dialog';
+import type { Order, OrderSearchFilters, OrderEbarimt, OrderItem } from '@/queries/order/type';
+import { STATUS_DELIVERY_STARTED, STATUS_CANCELLED_BY_ADMIN } from '@/queries/order/type';
 import { formatPrice } from '@/lib/utils';
 import { toast } from 'sonner';
 
@@ -56,7 +59,186 @@ const SORT_OPTIONS: { value: OrderSearchFilters['sortBy']; label: string }[] = [
   { value: 'deliveryDate', label: 'Хүргэлтийн огноо' },
 ];
 
+const TITLE = 'Захиалга | Gerar';
+
+type PendingAction = 'delivery_started' | 'delivered' | 'cancel' | null;
+
+function OrderRowActions({
+  order,
+  onOpenConfirm,
+  isMutationPending,
+  isDelivered,
+  onView,
+  onPrint,
+  isPrintPending,
+}: {
+  order: Order;
+  onOpenConfirm: (orderId: string, action: PendingAction) => void;
+  isMutationPending: boolean;
+  isDelivered: (status: Order['status']) => boolean;
+  onView: (orderId: string) => void;
+  onPrint: (orderId: string) => void;
+  isPrintPending: boolean;
+}) {
+  return (
+    <div className="flex flex-wrap items-center justify-end gap-1 md:flex-nowrap">
+      {order.status === 'PAID' && (
+        <>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 text-amber-600 hover:text-amber-700 hover:bg-amber-50"
+                onClick={() => onOpenConfirm(order.id, 'delivery_started')}
+                disabled={isMutationPending}
+              >
+                {isMutationPending ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Truck className="h-3.5 w-3.5" />
+                )}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Хүргэлтэд гарсан</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 text-green-600 hover:text-green-700 hover:bg-green-50"
+                onClick={() => onOpenConfirm(order.id, 'delivered')}
+                disabled={isMutationPending}
+              >
+                {isMutationPending ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <PackageCheck className="h-3.5 w-3.5" />
+                )}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Хүргэгдсэн</TooltipContent>
+          </Tooltip>
+        </>
+      )}
+      {order.status === STATUS_DELIVERY_STARTED && (
+        <>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 text-amber-600 cursor-default"
+                disabled
+              >
+                <Truck className="h-3.5 w-3.5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Хүргэлтэд гарсан</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 text-green-600 hover:text-green-700 hover:bg-green-50"
+                onClick={() => onOpenConfirm(order.id, 'delivered')}
+                disabled={isMutationPending}
+              >
+                {isMutationPending ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <PackageCheck className="h-3.5 w-3.5" />
+                )}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Хүргэгдсэн</TooltipContent>
+          </Tooltip>
+        </>
+      )}
+      {isDelivered(order.status) && (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 text-green-600 cursor-default"
+              disabled
+            >
+              <PackageCheck className="h-3.5 w-3.5" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Хүргэгдсэн</TooltipContent>
+        </Tooltip>
+      )}
+      {order.status === 'PAID' && (order.user?.phoneNumber ?? order.contactPhoneNumber) && (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 text-destructive hover:text-destructive"
+              onClick={() => onOpenConfirm(order.id, 'cancel')}
+            >
+              <XCircle className="h-3.5 w-3.5" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Цуцлах</TooltipContent>
+        </Tooltip>
+      )}
+      {order.status === STATUS_CANCELLED_BY_ADMIN && (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 text-destructive cursor-default"
+              disabled
+            >
+              <XCircle className="h-3.5 w-3.5" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Цуцлагдсан (админ баталгаажуулсан)</TooltipContent>
+        </Tooltip>
+      )}
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 text-muted-foreground hover:text-foreground"
+            onClick={() => onPrint(order.id)}
+            disabled={isPrintPending}
+          >
+            {isPrintPending ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Printer className="h-3.5 w-3.5" />
+            )}
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>Ебаримт хэвлэх</TooltipContent>
+      </Tooltip>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7"
+            onClick={() => onView(order.id)}
+          >
+            <Eye className="h-3.5 w-3.5" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>Харах</TooltipContent>
+      </Tooltip>
+    </div>
+  );
+}
+
 export const Route = createFileRoute('/_dashboard/orders/')({
+  head: () => ({ meta: [{ title: TITLE }] }),
   component: OrdersPage,
 });
 
@@ -85,39 +267,19 @@ function OrdersPage() {
   const [advancedFilters, setAdvancedFilters] = useState<OrderSearchFilters>(defaultAdvancedFilters);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [appliedFilters, setAppliedFilters] = useState<OrderSearchFilters>(defaultAdvancedFilters);
-  type PendingAction = 'delivery_started' | 'delivered' | 'cancel' | null;
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const [pendingOrderId, setPendingOrderId] = useState<number | null>(null);
+  const [pendingOrderId, setPendingOrderId] = useState<string | null>(null);
   const [pendingAction, setPendingAction] = useState<PendingAction>(null);
+  const [printingOrderId, setPrintingOrderId] = useState<string | null>(null);
+  const [ebarimtDialogOpen, setEbarimtDialogOpen] = useState(false);
+  const [ebarimtDialogData, setEbarimtDialogData] = useState<OrderEbarimt | null>(null);
+  const [ebarimtDialogItems, setEbarimtDialogItems] = useState<OrderItem[]>([]);
+  const [ebarimtDialogOrderId, setEbarimtDialogOrderId] = useState<string | null>(null);
+  const [ebarimtReceiverName, setEbarimtReceiverName] = useState<string | null>(null);
+  const [ebarimtReceiverPhone, setEbarimtReceiverPhone] = useState<string | null>(null);
+  const [ebarimtAddress, setEbarimtAddress] = useState<any>(null);
 
   const hasStatusFilter = statusFilter !== 'all';
-  const hasAdvancedFilter = useMemo(() => {
-    const a = appliedFilters;
-    return (
-      (a.orderId ?? '') !== '' ||
-      (a.phone ?? '') !== '' ||
-      (a.name ?? '') !== '' ||
-      (a.dateFrom ?? '') !== '' ||
-      (a.dateTo ?? '') !== '' ||
-      (a.deliveryDateFrom ?? '') !== '' ||
-      (a.deliveryDateTo ?? '') !== '' ||
-      a.totalMin != null ||
-      a.totalMax != null ||
-      (a.deliveryTimeSlot ?? '') !== '' ||
-      (a.paymentStatus ?? '') !== ''
-    );
-  }, [appliedFilters]);
-  const hasAnyFilter = hasStatusFilter || hasAdvancedFilter;
-  
-  // Check if simple search has been applied (is in appliedFilters)
-  const hasSimpleSearch = useMemo(() => {
-    const a = appliedFilters;
-    const searchTerm = (a.orderId ?? '').trim();
-    return searchTerm !== '' && 
-           a.orderId === a.phone && 
-           a.phone === a.name && 
-           searchTerm !== '';
-  }, [appliedFilters]);
 
   const searchFilters: OrderSearchFilters = useMemo(() => {
     return {
@@ -130,29 +292,40 @@ function OrdersPage() {
     };
   }, [hasStatusFilter, statusFilter, appliedFilters]);
 
-  const listQuery = useQuery(fetchOrdersOptions());
-  const searchQuery = useQuery({
-    ...fetchOrdersSearchOptions(searchFilters),
-    enabled: hasAnyFilter,
-  });
+  const searchQuery = useQuery(fetchOrdersSearchOptions(searchFilters));
 
-  const isLoading = hasAnyFilter ? searchQuery.isLoading : listQuery.isLoading;
-  const ordersFromList: Order[] = listQuery.data ?? [];
+  const countFiltersPaid = useMemo(
+    () => ({
+      ...appliedFilters,
+      status: 'PAID',
+      page: 1,
+      limit: 1,
+    }),
+    [appliedFilters],
+  );
+  const countFiltersDeliveryStarted = useMemo(
+    () => ({
+      ...appliedFilters,
+      status: STATUS_DELIVERY_STARTED,
+      page: 1,
+      limit: 1,
+    }),
+    [appliedFilters],
+  );
+  const paidCountQuery = useQuery(fetchOrdersSearchOptions(countFiltersPaid));
+  const deliveryStartedCountQuery = useQuery(fetchOrdersSearchOptions(countFiltersDeliveryStarted));
+  const paidCount = paidCountQuery.data?.total ?? null;
+  const deliveryStartedCount = deliveryStartedCountQuery.data?.total ?? null;
+
+  const isLoading = searchQuery.isLoading;
   const searchResult = searchQuery.data;
   const ordersFromSearch: Order[] = searchResult?.orders ?? [];
   const totalFromSearch = searchResult?.total ?? 0;
   const pageFromSearch = searchResult?.page ?? 1;
   const totalPagesFromSearch = searchResult?.totalPages ?? 1;
 
-  const filteredOrdersFromList =
-    statusFilter === 'all'
-      ? ordersFromList
-      : statusFilter === 'CANCELLED'
-        ? ordersFromList.filter((order) => isOrderCancelled(order.status))
-        : ordersFromList.filter((order) => order.status === statusFilter);
-
-  const displayOrders = hasAnyFilter ? ordersFromSearch : filteredOrdersFromList;
-  const displayTotal = hasAnyFilter ? totalFromSearch : filteredOrdersFromList.length;
+  const displayOrders = ordersFromSearch;
+  const displayTotal = totalFromSearch;
   const updateOrderStatusMutation = useUpdateOrderStatus();
 
   const formatDate = (dateString: string) => {
@@ -165,9 +338,24 @@ function OrdersPage() {
     });
   };
 
+  const formatDeliveryDate = (dateString: string | null | undefined) => {
+    if (!dateString) return '—';
+    return new Date(dateString).toLocaleDateString('mn-MN', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
+  };
+
+  const getDeliveryTimeSlotLabel = (slot: string | null | undefined) => {
+    if (!slot) return '';
+    const found = DELIVERY_TIME_SLOTS.find((s) => s.value === slot);
+    return found ? found.label : slot;
+  };
+
   const statusLabels: Record<string, string> = {
     PENDING: 'Төлбөр хүлээгдэх',
-    COMPLETED: 'Төлбөр төлөгдсөн',
+    PAID: 'Төлөгдсөн',
     CANCELLED: 'Цуцлагдсан',
     [STATUS_CANCELLED_BY_ADMIN]: 'Цуцлагдсан (админ баталгаажуулсан)',
     DELIVERED: 'Хүргэгдсэн',
@@ -178,25 +366,28 @@ function OrdersPage() {
   const getStatusBadge = (status: Order['status']) => {
     const variants = {
       PENDING: 'secondary',
-      COMPLETED: 'outline',
+      PAID: 'outline',
       CANCELLED: 'destructive',
       [STATUS_CANCELLED_BY_ADMIN]: 'destructive',
       DELIVERED: 'default',
       [STATUS_DELIVERY_STARTED]: 'outline',
       'Хүргэгдсэн': 'default', // Handle Mongolian status string from backend
     } as const;
-    const isCompleted = status === 'COMPLETED';
+    const isPaid = status === 'PAID';
+    const isDeliveryStarted = status === STATUS_DELIVERY_STARTED;
     const isDeliveredStatus = status === 'DELIVERED' || status === 'Хүргэгдсэн';
 
     return (
       <Badge
         variant={variants[status as keyof typeof variants] || 'secondary'}
         className={
-          isCompleted
+          isPaid
             ? 'border-amber-500 bg-amber-400/20 text-amber-800 dark:bg-amber-500/20 dark:text-amber-200 dark:border-amber-400'
-            : isDeliveredStatus
-              ? 'border-green-500 bg-green-500/20 text-green-800 dark:bg-green-500/20 dark:text-green-200 dark:border-green-400'
-              : undefined
+            : isDeliveryStarted
+              ? 'border-lime-500 bg-lime-400/25 text-lime-800 dark:bg-lime-500/25 dark:text-lime-200 dark:border-lime-400'
+              : isDeliveredStatus
+                ? 'border-green-500 bg-green-500/20 text-green-800 dark:bg-green-500/20 dark:text-green-200 dark:border-green-400'
+                : undefined
         }
       >
         {statusLabels[status] ?? status}
@@ -208,10 +399,75 @@ function OrdersPage() {
     return status === 'DELIVERED' || status === 'Хүргэгдсэн';
   };
 
-  const openConfirm = (orderId: number, action: PendingAction) => {
+  const openConfirm = (orderId: string, action: PendingAction) => {
     setPendingOrderId(orderId);
     setPendingAction(action);
     setConfirmOpen(true);
+  };
+
+  const hasEbarimtReceiptContent = (d: OrderEbarimt) => {
+    const any = d as Record<string, unknown>;
+    return !!(
+      any.receipt_url ||
+      any.receiptUrl ||
+      any.ebarimt_qr_data ||
+      any.ebarimtQrData ||
+      any.ebarimt_receipt_id ||
+      any.ebarimtReceiptId ||
+      any.ebarimt_lottery ||
+      any.ebarimtLottery ||
+      any.amount ||
+      any.ebarimtId ||
+      any.ebarimt_id
+    );
+  };
+
+  const handlePrint = async (orderId: string) => {
+    setPrintingOrderId(orderId);
+    try {
+      const order = ordersFromSearch.find((o) => o.id === orderId);
+      if (order) {
+        setEbarimtDialogItems(order.items);
+        setEbarimtReceiverName(order.user?.name ?? order.contactFullName ?? null);
+        setEbarimtReceiverPhone(order.user?.phoneNumber ?? order.contactPhoneNumber ?? null);
+        setEbarimtAddress(order.address ?? null);
+      } else {
+        setEbarimtDialogItems([]);
+        setEbarimtReceiverName(null);
+        setEbarimtReceiverPhone(null);
+        setEbarimtAddress(null);
+      }
+
+      // Testing: use mock ebarimt data on every print (toggle in src/queries/order/mock-ebarimt.ts)
+      if (USE_MOCK_EBARIMT) {
+        setEbarimtDialogData(MOCK_EBARIMT);
+        setEbarimtDialogOrderId(orderId);
+        setEbarimtDialogOpen(true);
+        setPrintingOrderId(null);
+        return;
+      }
+      const data = await getOrderEbarimt(orderId);
+      const rawUrl = data.receiptUrl ?? (data as Record<string, unknown>).receipt_url;
+      const receiptUrl = typeof rawUrl === 'string' ? rawUrl : null;
+      if (receiptUrl) {
+        window.open(receiptUrl, '_blank', 'noopener,noreferrer');
+        toast.success('Ебаримтын хуудас нээгдлээ. Хэвлэх цонхноос хэвлэнэ үү.');
+      } else if (hasEbarimtReceiptContent(data)) {
+        setEbarimtDialogData(data);
+        setEbarimtDialogOrderId(orderId);
+        setEbarimtDialogOpen(true);
+      } else {
+        toast.info(
+          data.ebarimtId ?? (data as Record<string, unknown>).ebarimt_id
+            ? 'Энэ захиалгын ебаримтын хэвлэх холбоос байхгүй байна.'
+            : 'Энэ захиалгад ебаримт байхгүй байна.',
+        );
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Ебаримт татахад алдаа гарлаа.');
+    } finally {
+      setPrintingOrderId(null);
+    }
   };
 
   const closeConfirm = () => {
@@ -241,7 +497,7 @@ function OrdersPage() {
       } else if (action === 'cancel') {
         navigate({
           to: '/orders/$id',
-          params: { id: String(orderId) },
+          params: { id: orderId },
         });
       }
     } catch (error) {
@@ -309,7 +565,7 @@ function OrdersPage() {
     if (searchTerm === '') {
       setAppliedFilters(defaultAdvancedFilters);
     } else {
-      // Update appliedFilters to trigger search
+      // Simple search: one term searches order ID, phone, and name at once
       setAppliedFilters((prev) => ({
         ...prev,
         orderId: searchTerm,
@@ -327,47 +583,52 @@ function OrdersPage() {
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-4">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
             <h1 className="text-3xl font-bold">Захиалга</h1>
             <p className="text-muted-foreground">Бүх захиалгыг харах болон удирдах</p>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <Button
-              variant={statusFilter === 'all' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setStatusFilter('all')}
-            >
-              Бүгд
-            </Button>
-            <Button
-              variant={statusFilter === 'PENDING' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setStatusFilter('PENDING')}
-            >
-              Төлбөр хүлээгдэх
-            </Button>
-            <Button
-              variant={statusFilter === 'COMPLETED' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setStatusFilter('COMPLETED')}
-            >
-              Төлбөр төлөгдсөн
-            </Button>
-            <Button
-              variant={statusFilter === 'CANCELLED' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setStatusFilter('CANCELLED')}
-            >
-              Цуцлагдсан
-            </Button>
-            <Button
-              variant={statusFilter === STATUS_DELIVERY_STARTED ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setStatusFilter(STATUS_DELIVERY_STARTED)}
-            >
-              Хүргэлт эхэлсэн
-            </Button>
+          <div className="flex flex-nowrap gap-3 overflow-x-auto pb-1 md:flex-wrap md:overflow-visible md:pb-0">
+            {[
+              { value: 'all', label: 'Бүгд', icon: LayoutList, count: null },
+              { value: 'PAID', label: 'Төлөгдсөн', icon: CreditCard, count: paidCount },
+              { value: STATUS_DELIVERY_STARTED, label: 'Хүргэлт эхэлсэн', icon: Truck, count: deliveryStartedCount },
+              { value: 'PENDING', label: 'Төлбөр хүлээгдэх', icon: Clock, count: null },
+              { value: 'CANCELLED', label: 'Цуцлагдсан', icon: XCircle, count: null },
+            ].map(({ value, label, icon: Icon, count }) => {
+              const isActive = statusFilter === value;
+              const showBadge = count != null && count > 0;
+              return (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setStatusFilter(value)}
+                  className={`
+                    relative flex shrink-0 flex-col items-center justify-center gap-1.5 rounded-xl border-2 px-4 py-3 text-center transition-colors
+                    min-w-[100px] max-w-[120px]
+                    ${isActive
+                      ? 'border-green-600 bg-green-50 text-green-800 dark:border-green-500 dark:bg-green-950/40 dark:text-green-200'
+                      : 'border-border bg-background text-muted-foreground hover:border-muted-foreground/30 hover:bg-muted/50 dark:bg-card dark:hover:bg-muted/30'
+                    }
+                  `}
+                >
+                  <span className="relative inline-flex shrink-0">
+                    <Icon className="h-6 w-6 shrink-0" strokeWidth={1.5} />
+                    {showBadge && (
+                      <span
+                        className="absolute -right-2 -top-2 flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[10px] font-bold tabular-nums text-white shadow-sm ring-2 ring-background
+                          bg-amber-500 dark:bg-amber-500 dark:ring-background
+                          animate-in zoom-in-50 duration-200"
+                        aria-label={`${count} захиалга`}
+                      >
+                        {count > 99 ? '99+' : count}
+                      </span>
+                    )}
+                  </span>
+                  <span className="text-xs font-medium leading-tight">{label}</span>
+                </button>
+              );
+            })}
           </div>
         </div>
 
@@ -415,7 +676,7 @@ function OrdersPage() {
                 <CardTitle>Бүх захиалга</CardTitle>
                 <CardDescription>
                   Нийт {displayTotal} захиалга
-                  {hasAnyFilter && totalPagesFromSearch > 1 && ` · Хуудас ${pageFromSearch} / ${totalPagesFromSearch}`}
+                  {totalPagesFromSearch > 1 && ` · Хуудас ${pageFromSearch} / ${totalPagesFromSearch}`}
                 </CardDescription>
               </div>
               <Button
@@ -601,181 +862,135 @@ function OrdersPage() {
               Захиалга олдсонгүй.
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Захиалгын ID</TableHead>
-                  <TableHead>Хэрэглэгч</TableHead>
-                  <TableHead>Утас</TableHead>
-                  <TableHead>Бараа</TableHead>
-                  <TableHead>Нийт</TableHead>
-                  <TableHead className="text-center">Төлөв</TableHead>
-                  <TableHead>Огноо</TableHead>
-                  <TableHead className="text-right w-0">Үйлдлүүд</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+            <>
+              {/* Mobile: card list – all content and actions visible without horizontal scroll */}
+              <div className="space-y-3 md:hidden">
                 {displayOrders.map((order) => (
-                  <TableRow key={order.id}>
+                  <Card key={order.id} className="p-4">
+                    <div className="space-y-3">
+                      <div className="flex items-start justify-between gap-2 flex-wrap">
+                        <span className="font-medium">#{order.id}</span>
+                        {getStatusBadge(order.status)}
+                      </div>
+                      <div className="grid gap-1.5 text-sm">
+                        <div>
+                          <span className="text-muted-foreground">Хэрэглэгч:</span>{' '}
+                          {order.user?.name ?? order.contactFullName ?? 'Байхгүй'}
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">Утас:</span>{' '}
+                          {order.user?.phoneNumber ?? order.contactPhoneNumber ?? 'Байхгүй'}
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">Бараа:</span> {order.items.length}
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">Нийт:</span> {formatPrice(order.totalAmount)}
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">Захиалга үүссэн:</span> {formatDate(order.createdAt)}
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">Хүргэлтийн огноо, цаг:</span>{' '}
+                          {order.deliveryDate
+                            ? [formatDeliveryDate(order.deliveryDate), getDeliveryTimeSlotLabel(order.deliveryTimeSlot)].filter(Boolean).join(' · ')
+                            : '—'}
+                        </div>
+                      </div>
+                      <div className="border-t pt-3">
+                        <OrderRowActions
+                          order={order}
+                          onOpenConfirm={openConfirm}
+                          isMutationPending={updateOrderStatusMutation.isPending}
+                          isDelivered={isDelivered}
+                          onView={(id) => navigate({ to: '/orders/$id', params: { id } })}
+                          onPrint={handlePrint}
+                          isPrintPending={printingOrderId === order.id}
+                        />
+                      </div>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+              {/* Desktop: table */}
+              <div className="hidden md:block overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0">
+                <Table className="min-w-[800px]">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Захиалгын ID</TableHead>
+                    <TableHead>Хэрэглэгч</TableHead>
+                    <TableHead>Утас</TableHead>
+                    <TableHead>Бараа</TableHead>
+                    <TableHead>Нийт</TableHead>
+                    <TableHead className="text-center">Төлөв</TableHead>
+                    <TableHead>Захиалга үүссэн</TableHead>
+                    <TableHead>Хүргэлтийн огноо, цаг</TableHead>
+                    <TableHead className="text-right w-0">Үйлдлүүд</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                {displayOrders.map((order) => (
+                  <TableRow
+                    key={order.id}
+                    className="cursor-pointer"
+                    onDoubleClick={(e) => {
+                      if ((e.target as HTMLElement).closest('button')) return;
+                      navigate({ to: '/orders/$id', params: { id: order.id } });
+                    }}
+                  >
                     <TableCell className="font-medium">#{order.id}</TableCell>
-                    <TableCell>{order.user?.name || 'Байхгүй'}</TableCell>
-                    <TableCell>{order.user?.phoneNumber || 'Байхгүй'}</TableCell>
+                    <TableCell>{order.user?.name ?? order.contactFullName ?? 'Байхгүй'}</TableCell>
+                    <TableCell>{order.user?.phoneNumber ?? order.contactPhoneNumber ?? 'Байхгүй'}</TableCell>
                     <TableCell>{order.items.length}</TableCell>
                     <TableCell>{formatPrice(order.totalAmount)}</TableCell>
                     <TableCell className="text-center">{getStatusBadge(order.status)}</TableCell>
                     <TableCell>{formatDate(order.createdAt)}</TableCell>
+                    <TableCell className="whitespace-nowrap">
+                      {order.deliveryDate
+                        ? [formatDeliveryDate(order.deliveryDate), getDeliveryTimeSlotLabel(order.deliveryTimeSlot)].filter(Boolean).join(' · ')
+                        : '—'}
+                    </TableCell>
                     <TableCell className="text-right w-0">
-                      <div className="flex items-center justify-end gap-0.5">
-                        {order.status === 'COMPLETED' && (
-                          <>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-7 w-7 text-amber-600 hover:text-amber-700 hover:bg-amber-50"
-                                  onClick={() => openConfirm(order.id, 'delivery_started')}
-                                  disabled={updateOrderStatusMutation.isPending}
-                                >
-                                  {updateOrderStatusMutation.isPending ? (
-                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                  ) : (
-                                    <Truck className="h-3.5 w-3.5" />
-                                  )}
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>Хүргэлтэд гарсан</TooltipContent>
-                            </Tooltip>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-7 w-7 text-green-600 hover:text-green-700 hover:bg-green-50"
-                                  onClick={() => openConfirm(order.id, 'delivered')}
-                                  disabled={updateOrderStatusMutation.isPending}
-                                >
-                                  {updateOrderStatusMutation.isPending ? (
-                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                  ) : (
-                                    <PackageCheck className="h-3.5 w-3.5" />
-                                  )}
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>Хүргэгдсэн</TooltipContent>
-                            </Tooltip>
-                          </>
-                        )}
-                        {order.status === STATUS_DELIVERY_STARTED && (
-                          <>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-7 w-7 text-amber-600 cursor-default"
-                                  disabled
-                                >
-                                  <Truck className="h-3.5 w-3.5" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>Хүргэлтэд гарсан</TooltipContent>
-                            </Tooltip>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-7 w-7 text-green-600 hover:text-green-700 hover:bg-green-50"
-                                  onClick={() => openConfirm(order.id, 'delivered')}
-                                  disabled={updateOrderStatusMutation.isPending}
-                                >
-                                  {updateOrderStatusMutation.isPending ? (
-                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                  ) : (
-                                    <PackageCheck className="h-3.5 w-3.5" />
-                                  )}
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>Хүргэгдсэн</TooltipContent>
-                            </Tooltip>
-                          </>
-                        )}
-                        {isDelivered(order.status) && (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-7 w-7 text-green-600 cursor-default"
-                                disabled
-                              >
-                                <PackageCheck className="h-3.5 w-3.5" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>Хүргэгдсэн</TooltipContent>
-                          </Tooltip>
-                        )}
-                        {order.status === 'COMPLETED' && order.user?.phoneNumber && (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-7 w-7 text-destructive hover:text-destructive"
-                                onClick={() => openConfirm(order.id, 'cancel')}
-                              >
-                                <XCircle className="h-3.5 w-3.5" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>Цуцлах</TooltipContent>
-                          </Tooltip>
-                        )}
-                        {order.status === STATUS_CANCELLED_BY_ADMIN && (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-7 w-7 text-destructive cursor-default"
-                                disabled
-                              >
-                                <XCircle className="h-3.5 w-3.5" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>Цуцлагдсан (админ баталгаажуулсан)</TooltipContent>
-                          </Tooltip>
-                        )}
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-7 w-7"
-                              onClick={() =>
-                                navigate({
-                                  to: '/orders/$id',
-                                  params: { id: String(order.id) },
-                                })
-                              }
-                            >
-                              <Eye className="h-3.5 w-3.5" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>Харах</TooltipContent>
-                        </Tooltip>
-                      </div>
+                      <OrderRowActions
+                        order={order}
+                        onOpenConfirm={openConfirm}
+                        isMutationPending={updateOrderStatusMutation.isPending}
+                        isDelivered={isDelivered}
+                        onView={(id) => navigate({ to: '/orders/$id', params: { id } })}
+                        onPrint={handlePrint}
+                        isPrintPending={printingOrderId === order.id}
+                      />
                     </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
-            </Table>
+              </Table>
+              </div>
+            </>
           )}
-          {hasAnyFilter && totalPagesFromSearch > 1 && (
-            <div className="mt-4 flex items-center justify-between border-t pt-4">
-              <p className="text-muted-foreground text-sm">
-                Хуудас {pageFromSearch} / {totalPagesFromSearch} (нийт {totalFromSearch} захиалга)
-              </p>
+          {totalPagesFromSearch > 1 && (
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-4 border-t pt-4">
+              <div className="flex items-center gap-4">
+                <p className="text-muted-foreground text-sm">
+                  Хуудас {pageFromSearch} / {totalPagesFromSearch} (нийт {totalFromSearch} захиалга)
+                </p>
+                <Select
+                  value={String(appliedFilters.limit ?? 20)}
+                  onValueChange={(v) => setAppliedFilters((prev) => ({ ...prev, limit: Number(v), page: 1 }))}
+                >
+                  <SelectTrigger className="w-20 h-8 text-sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {[10, 20, 50, 100].map((n) => (
+                      <SelectItem key={n} value={String(n)}>
+                        {n}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <span className="text-muted-foreground text-sm">/ хуудас</span>
+              </div>
               <div className="flex gap-2">
                 <Button
                   variant="outline"
@@ -830,6 +1045,16 @@ function OrdersPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      <EbarimtReceiptDialog
+        open={ebarimtDialogOpen}
+        onOpenChange={setEbarimtDialogOpen}
+        data={ebarimtDialogData}
+        items={ebarimtDialogItems}
+        orderId={ebarimtDialogOrderId ?? undefined}
+        receiverName={ebarimtReceiverName}
+        receiverPhone={ebarimtReceiverPhone}
+        address={ebarimtAddress}
+      />
     </div>
   );
 }

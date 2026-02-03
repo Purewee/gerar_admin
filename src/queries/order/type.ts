@@ -16,34 +16,50 @@ export function isOrderCancelled(status: string): boolean {
 
 export const OrderItemSchema = z.object({
   id: z.number(),
-  orderId: z.number(),
+  orderId: z.union([z.number(), z.string()]),
   productId: z.number(),
   quantity: z.number(),
   price: z.string(),
   product: ProductSchema.extend({
     category: CategorySchema.optional(),
+    categories: z.array(CategorySchema).optional(),
   }).optional(),
-});
+}).passthrough();
+
+/** Delivery address on order (shape may vary); null for guest orders without address. */
+const OrderAddressSchema = z.union([z.object({}).passthrough(), z.null()]).optional();
 
 export const OrderSchema = z.object({
-  id: z.number(),
-  userId: z.number(),
+  /** Order ID in format YYMMDDNNN (e.g. "260126001"). */
+  id: z.string(),
+  userId: z.number().nullable(),
+  addressId: z.number().nullable().optional(),
+  deliveryTimeSlot: z.string().nullable().optional(),
+  deliveryDate: z.string().nullable().optional(),
   totalAmount: z.string(),
   status: z.union([
-    z.enum(['PENDING', 'COMPLETED', 'CANCELLED', 'CANCELLED_BY_ADMIN', 'DELIVERED', 'DELIVERY_STARTED']),
-    z.string(), // Allow any string status for flexibility (e.g., "Хүргэгдсэн")
+    z.enum(['PENDING', 'PAID', 'COMPLETED', 'CANCELLED', 'CANCELLED_BY_ADMIN', 'DELIVERED', 'DELIVERY_STARTED']),
+    z.string(), // Allow any string status (e.g. "Хүргэгдсэн")
   ]),
+  paymentStatus: z.string().optional(),
+  /** Contact info from order form; used for guest orders when user is null. */
+  contactFullName: z.string().optional().nullable(),
+  contactPhoneNumber: z.string().optional().nullable(),
+  contactEmail: z.string().optional().nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
+  /** Registered user: { id, phoneNumber, name }; null for guest orders. */
   user: z
     .object({
       id: z.number(),
       phoneNumber: z.string(),
       name: z.string(),
     })
+    .nullable()
     .optional(),
+  address: OrderAddressSchema.optional(),
   items: z.array(OrderItemSchema),
-});
+}).passthrough();
 
 export const OrdersResponseSchema = z.object({
   success: z.boolean(),
@@ -96,3 +112,73 @@ export interface SearchOrdersResult {
   limit: number;
   totalPages: number;
 }
+
+/** Single event in order timeline (GET /api/admin/orders/:id/timeline). */
+export const OrderTimelineEventSchema = z.object({
+  id: z.number(),
+  orderId: z.string(),
+  type: z.enum(['ORDER_CREATED', 'STATUS_CHANGED', 'PAYMENT_STATUS_CHANGED', 'MESSAGE_SENT']),
+  title: z.string(),
+  description: z.string().nullable(),
+  fromValue: z.string().nullable(),
+  toValue: z.string().nullable(),
+  channel: z.string().nullable(),
+  performedBy: z.number().nullable(),
+  createdAt: z.string(),
+  performer: z
+    .object({
+      id: z.number(),
+      name: z.string(),
+    })
+    .nullable(),
+  _synthetic: z.boolean().optional(),
+}).passthrough();
+
+export const OrderTimelineResponseSchema = z.object({
+  success: z.boolean(),
+  message: z.string(),
+  data: z.array(OrderTimelineEventSchema),
+});
+
+export type OrderTimelineEvent = z.infer<typeof OrderTimelineEventSchema>;
+export type OrderTimelineResponse = z.infer<typeof OrderTimelineResponseSchema>;
+
+/** Ebarimt (receipt) info for printing – GET /api/admin/orders/:id/ebarimt */
+export const OrderEbarimtSchema = z
+  .object({
+    ebarimtId: z.string().nullable().optional(),
+    receiptUrl: z.string().nullable().optional(),
+    /** Full receipt payload (testing / when receipt_url is null) – accept both snake_case and camelCase */
+    ebarimt_id: z.string().optional(),
+    receipt_url: z.string().nullable().optional(),
+    ebarimt_receipt_id: z.string().optional().nullable(),
+    ebarimt_qr_data: z.string().optional().nullable(),
+    ebarimt_status: z.string().optional().nullable(),
+    ebarimt_lottery: z.string().optional().nullable(),
+    ebarimt_by: z.string().optional().nullable(),
+    ebarimt_receiver_type: z.string().optional().nullable(),
+    ebarimt_receiver: z.string().optional().nullable(),
+    ebarimt_receiver_phone: z.string().optional().nullable(),
+    amount: z.string().optional().nullable(),
+    vat_amount: z.string().optional().nullable(),
+    city_tax_amount: z.string().optional().nullable(),
+    merchant_register_no: z.string().optional().nullable(),
+    merchant_tin: z.string().optional().nullable(),
+    barimt_status: z.string().optional().nullable(),
+    barimt_status_date: z.string().optional().nullable(),
+    paid_by: z.string().optional().nullable(),
+    object_type: z.string().optional().nullable(),
+    note: z.string().optional().nullable(),
+    created_date: z.string().optional().nullable(),
+    ebarimtQrData: z.string().optional().nullable(),
+    ebarimtLottery: z.string().optional().nullable(),
+    ebarimtReceiptId: z.string().optional().nullable(),
+  })
+  .passthrough();
+export const OrderEbarimtResponseSchema = z.object({
+  success: z.boolean(),
+  message: z.string(),
+  data: OrderEbarimtSchema,
+});
+export type OrderEbarimt = z.infer<typeof OrderEbarimtSchema>;
+export type OrderEbarimtResponse = z.infer<typeof OrderEbarimtResponseSchema>;

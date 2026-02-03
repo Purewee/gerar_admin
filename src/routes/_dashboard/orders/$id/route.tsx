@@ -22,25 +22,136 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { fetchOrderOptions, useRequestCancellation, useConfirmCancellation, useUpdateOrderStatus } from '@/queries/order/options';
+import { fetchOrderOptions, fetchOrderTimelineOptions, useRequestCancellation, useConfirmCancellation, useUpdateOrderStatus } from '@/queries/order/options';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatPrice } from '@/lib/utils';
 import { toast } from 'sonner';
-import { XCircle, ShieldCheck, Truck, PackageCheck } from 'lucide-react';
+import { XCircle, ShieldCheck, Truck, PackageCheck, Clock, Mail, MessageSquare, CreditCard, ShoppingCart, ArrowRightCircle } from 'lucide-react';
 import { STATUS_DELIVERY_STARTED } from '@/queries/order/type';
+import type { OrderTimelineEvent } from '@/queries/order/type';
+
+const DELIVERY_TIME_SLOTS = [
+  { value: '10-14', label: '10:00 - 14:00' },
+  { value: '14-18', label: '14:00 - 18:00' },
+  { value: '18-21', label: '18:00 - 21:00' },
+  { value: '21-00', label: '21:00 - 00:00' },
+];
+
+/** Map API timeline titles (EN) to Mongolian. */
+const TIMELINE_TITLE_MN: Record<string, string> = {
+  'Order placed': 'Захиалга үүсгэсэн',
+  'Payment confirmed': 'Төлбөр баталгаажсан',
+  'Payment receipt email sent': 'Төлбөрийн баримт имэйл илгээсэн',
+  'Status updated': 'Төлөв шинэчлэгдсэн',
+  'Delivery started SMS sent': 'Хүргэлт эхэлсэн мэдэгдэл SMS илгээсэн',
+  'Cancellation code sent to user': 'Цуцлах код хэрэглэгч рүү илгээсэн',
+};
+/** Map API timeline descriptions (EN) to Mongolian. */
+const TIMELINE_DESC_MN: Record<string, string> = {
+  'User notified that delivery has started': 'Хэрэглэгчид хүргэлт эхэлсэн мэдэгдэл өгсөн',
+};
+
+/** Deduplicate: keep only the first ORDER_CREATED (API may return synthetic + DB row). */
+function deduplicateOrderCreated(events: OrderTimelineEvent[]): OrderTimelineEvent[] {
+  let seenOrderCreated = false;
+  return events.filter((e) => {
+    if (e.type === 'ORDER_CREATED') {
+      if (seenOrderCreated) return false;
+      seenOrderCreated = true;
+    }
+    return true;
+  });
+}
+
+function OrderTimeline({
+  events,
+  formatDate,
+  getStatusLabel,
+}: {
+  events: OrderTimelineEvent[];
+  formatDate: (date: string) => string;
+  getStatusLabel: (value: string | null | undefined) => string | null;
+}) {
+  const displayEvents = deduplicateOrderCreated(events);
+
+  const getEventIcon = (event: OrderTimelineEvent) => {
+    switch (event.type) {
+      case 'ORDER_CREATED':
+        return <ShoppingCart className="h-4 w-4 text-muted-foreground" />;
+      case 'PAYMENT_STATUS_CHANGED':
+        return <CreditCard className="h-4 w-4 text-green-600" />;
+      case 'MESSAGE_SENT':
+        return event.channel === 'email' ? (
+          <Mail className="h-4 w-4 text-blue-600" />
+        ) : (
+          <MessageSquare className="h-4 w-4 text-amber-600" />
+        );
+      case 'STATUS_CHANGED':
+        return <ArrowRightCircle className="h-4 w-4 text-primary" />;
+      default:
+        return <Clock className="h-4 w-4 text-muted-foreground" />;
+    }
+  };
+
+  const getTitle = (event: OrderTimelineEvent) =>
+    TIMELINE_TITLE_MN[event.title] ?? event.title;
+  const getDescription = (event: OrderTimelineEvent) =>
+    (event.description && TIMELINE_DESC_MN[event.description]) ?? event.description;
+
+  return (
+    <ul className="relative space-y-0">
+      {displayEvents.map((event, index) => (
+        <li key={`${event.id}-${index}`} className="relative flex gap-3 pb-6 last:pb-0">
+          {index < displayEvents.length - 1 && (
+            <span
+              className="absolute left-[11px] top-6 bottom-0 w-px bg-border"
+              aria-hidden
+            />
+          )}
+          <span className="relative z-10 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 border-background bg-muted">
+            {getEventIcon(event)}
+          </span>
+          <div className="flex-1 min-w-0 pt-0.5">
+            <p className="text-sm font-medium">{getTitle(event)}</p>
+            {(event.type === 'STATUS_CHANGED' || event.type === 'PAYMENT_STATUS_CHANGED') &&
+              (event.fromValue != null || event.toValue != null) && (
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {getStatusLabel(event.fromValue) ?? event.fromValue} → {getStatusLabel(event.toValue) ?? event.toValue}
+              </p>
+            )}
+            {getDescription(event) && (
+              <p className="text-xs text-muted-foreground mt-0.5">{getDescription(event)}</p>
+            )}
+            {event.performer?.name && (
+              <p className="text-xs text-muted-foreground mt-0.5">Хийсэн: {event.performer.name}</p>
+            )}
+            <p className="text-xs text-muted-foreground mt-1">{formatDate(event.createdAt)}</p>
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 export const Route = createFileRoute('/_dashboard/orders/$id')({
+  head: ({ params }) => ({
+    meta: [{ title: `Захиалга #${params.id} | Gerar` }],
+  }),
   component: OrderDetailPage,
-  loader: ({ params }) => {
-    return { orderId: Number(params.id) };
+  loader: ({ params }): { orderId: string } => {
+    return { orderId: params.id };
   },
 });
 
 function OrderDetailPage() {
-  const { orderId } = Route.useLoaderData();
+  const { orderId } = Route.useLoaderData() as { orderId: string };
   
   // Fetch order by ID via GET /api/admin/orders/:id (admin can view any order)
   const { data: order, isLoading } = useQuery(fetchOrderOptions(orderId));
+  const { data: timelineEvents = [], isLoading: timelineLoading } = useQuery({
+    ...fetchOrderTimelineOptions(orderId),
+    enabled: !!orderId,
+  });
   
   const requestCancellationMutation = useRequestCancellation();
   const confirmCancellationMutation = useConfirmCancellation();
@@ -49,7 +160,6 @@ function OrderDetailPage() {
   const [showConfirmRequestDialog, setShowConfirmRequestDialog] = useState(false);
   const [showCancellationDialog, setShowCancellationDialog] = useState(false);
   const [cancellationCode, setCancellationCode] = useState('');
-  const [hasRequestedCancellation, setHasRequestedCancellation] = useState(false);
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleString('mn-MN', {
@@ -61,8 +171,24 @@ function OrderDetailPage() {
     });
   };
 
+  const formatDeliveryDate = (dateString: string | null | undefined) => {
+    if (!dateString) return null;
+    return new Date(dateString).toLocaleDateString('mn-MN', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    });
+  };
+
+  const getDeliveryTimeSlotLabel = (slot: string | null | undefined) => {
+    if (!slot) return null;
+    const found = DELIVERY_TIME_SLOTS.find((s) => s.value === slot);
+    return found ? found.label : slot;
+  };
+
   const statusLabels: Record<string, string> = {
     PENDING: 'Төлбөр хүлээгдэх',
+    PAID: 'Төлбөр төлөгдсөн',
     COMPLETED: 'Төлбөр төлөгдсөн',
     CANCELLED: 'Цуцлагдсан',
     CANCELLED_BY_ADMIN: 'Цуцлагдсан (админ баталгаажуулсан)',
@@ -71,9 +197,16 @@ function OrderDetailPage() {
     'Хүргэгдсэн': 'Хүргэгдсэн', // Handle Mongolian status string from backend
   };
 
+  /** Resolve status label for timeline fromValue/toValue. */
+  const getStatusLabel = (value: string | null | undefined) => {
+    if (value == null || value === '') return null;
+    return statusLabels[value] ?? value;
+  };
+
   const getStatusBadge = (status: string) => {
     const variants = {
       PENDING: 'secondary',
+      PAID: 'default',
       COMPLETED: 'default',
       CANCELLED: 'destructive',
       CANCELLED_BY_ADMIN: 'destructive',
@@ -89,11 +222,11 @@ function OrderDetailPage() {
     );
   };
 
-  // Check if order can be cancelled (paid/completed orders only, and must have user phone)
+  // Check if order can be cancelled (paid/completed orders only; must have phone for SMS – user or guest contact)
   const canCancelOrder =
     order &&
-    order.status === 'COMPLETED' &&
-    order.user?.phoneNumber;
+    (order.status === 'PAID' || order.status === 'COMPLETED') &&
+    (order.user?.phoneNumber ?? order.contactPhoneNumber);
 
   const handleRequestCancellation = async () => {
     if (!order) return;
@@ -101,7 +234,6 @@ function OrderDetailPage() {
     try {
       await requestCancellationMutation.mutateAsync(orderId);
       toast.success('Цуцлах код SMS-аар илгээгдлээ. Хэрэглэгчээс кодыг авч баталгаажуулна уу.');
-      setHasRequestedCancellation(true);
       setShowConfirmRequestDialog(false);
       setShowCancellationDialog(true);
     } catch (error) {
@@ -114,7 +246,6 @@ function OrderDetailPage() {
         console.warn('SMS may have been sent despite error:', errorMessage);
         // Still proceed with the cancellation flow since SMS was likely sent
         toast.warning('Код илгээгдсэн байж магадгүй. Хэрэв хэрэглэгч SMS хүлээн авсан бол үргэлжлүүлнэ үү.');
-        setHasRequestedCancellation(true);
         setShowConfirmRequestDialog(false);
         setShowCancellationDialog(true);
       } else {
@@ -138,7 +269,6 @@ function OrderDetailPage() {
       toast.success('Захиалга амжилттай цуцлагдлаа');
       setShowCancellationDialog(false);
       setCancellationCode('');
-      setHasRequestedCancellation(false);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Цуцлах баталгаажуулахад алдаа гарлаа';
       toast.error(errorMessage);
@@ -202,12 +332,18 @@ function OrderDetailPage() {
           <CardContent className="space-y-2">
             <div>
               <span className="text-sm font-medium text-muted-foreground">Нэр:</span>
-              <p className="text-lg">{order.user?.name || "Байхгүй"}</p>
+              <p className="text-lg">{order.user?.name ?? order.contactFullName ?? "Байхгүй"}</p>
             </div>
             <div>
               <span className="text-sm font-medium text-muted-foreground">Утас:</span>
-              <p className="text-lg">{order.user?.phoneNumber || "Байхгүй"}</p>
+              <p className="text-lg">{order.user?.phoneNumber ?? order.contactPhoneNumber ?? "Байхгүй"}</p>
             </div>
+            {(order.contactEmail ?? undefined) && (
+              <div>
+                <span className="text-sm font-medium text-muted-foreground">Имэйл:</span>
+                <p className="text-lg">{order.contactEmail}</p>
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -220,9 +356,9 @@ function OrderDetailPage() {
               <span className="text-sm font-medium text-muted-foreground">Төлөв:</span>
               <div className="mt-1">{getStatusBadge(order.status)}</div>
             </div>
-            {(order.status === 'COMPLETED' || order.status === STATUS_DELIVERY_STARTED) && (
+            {(order.status === 'PAID' || order.status === 'COMPLETED' || order.status === STATUS_DELIVERY_STARTED) && (
               <div className="pt-4 border-t space-y-2">
-                {order.status === 'COMPLETED' && (
+                {(order.status === 'PAID' || order.status === 'COMPLETED') && (
                   <Button
                     variant="outline"
                     onClick={() => handleUpdateStatus(STATUS_DELIVERY_STARTED)}
@@ -248,6 +384,16 @@ function OrderDetailPage() {
                 </Button>
               </div>
             )}
+            <div>
+              <span className="text-sm font-medium text-muted-foreground">Хүргэлтийн огноо, цаг:</span>
+              <p className="text-lg">
+                {order.deliveryDate ? (
+                  [formatDeliveryDate(order.deliveryDate), getDeliveryTimeSlotLabel(order.deliveryTimeSlot)].filter(Boolean).join(' · ') || '—'
+                ) : (
+                  '—'
+                )}
+              </p>
+            </div>
             <div>
               <span className="text-sm font-medium text-muted-foreground">Үүсгэсэн:</span>
               <p className="text-lg">{formatDate(order.createdAt)}</p>
@@ -275,6 +421,37 @@ function OrderDetailPage() {
 
       <Card>
         <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Clock className="h-5 w-5" />
+            Төлөв өөрчлөлтийн түүх
+          </CardTitle>
+          <CardDescription>
+            Захиалга үүсгэсэн, төлбөр баталгаажсан, мессеж илгээсэн, төлөв өөрчлөлт
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {timelineLoading ? (
+            <ul className="space-y-4">
+              {[1, 2, 3].map((i) => (
+                <li key={i} className="flex gap-3">
+                  <Skeleton className="h-3 w-3 shrink-0 mt-1.5 rounded-full" />
+                  <div className="space-y-1 flex-1">
+                    <Skeleton className="h-4 w-48" />
+                    <Skeleton className="h-3 w-24" />
+                  </div>
+                </li>
+              ))}
+            </ul>
+          ) : timelineEvents.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Түүх байхгүй байна.</p>
+          ) : (
+            <OrderTimeline events={timelineEvents} formatDate={formatDate} getStatusLabel={getStatusLabel} />
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
           <CardTitle>Захиалгын бараанууд</CardTitle>
           <CardDescription>Энэ захиалгад {order.items.length} бараа</CardDescription>
         </CardHeader>
@@ -295,7 +472,9 @@ function OrderDetailPage() {
                   <TableCell className="font-medium">
                     {item.product?.name || 'Байхгүй'}
                   </TableCell>
-                  <TableCell>{item.product?.category?.name || 'Байхгүй'}</TableCell>
+                  <TableCell>
+                    {item.product?.categories?.[0]?.name ?? item.product?.category?.name ?? 'Байхгүй'}
+                  </TableCell>
                   <TableCell>{item.quantity}</TableCell>
                   <TableCell>{formatPrice(item.price)}</TableCell>
                   <TableCell className="text-right">
@@ -334,10 +513,10 @@ function OrderDetailPage() {
                 <strong>Захиалгын дугаар:</strong> #{order.id}
               </p>
               <p className="text-sm text-muted-foreground">
-                <strong>Хэрэглэгч:</strong> {order.user?.name || 'N/A'}
+                <strong>Хэрэглэгч:</strong> {order.user?.name ?? order.contactFullName ?? 'N/A'}
               </p>
               <p className="text-sm text-muted-foreground">
-                <strong>Утас:</strong> {order.user?.phoneNumber || 'N/A'}
+                <strong>Утас:</strong> {order.user?.phoneNumber ?? order.contactPhoneNumber ?? 'N/A'}
               </p>
               <p className="text-sm text-muted-foreground">
                 <strong>Нийт дүн:</strong> {formatPrice(order.totalAmount)}

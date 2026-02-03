@@ -120,6 +120,8 @@ export function ProductForm({
       categoryId: defaultValues?.categoryId,
       categoryIds: defaultValues?.categoryIds || (defaultValues?.categoryId ? [defaultValues.categoryId] : []),
       images: defaultValues?.images || [],
+      classificationCode: defaultValues?.classificationCode ?? null,
+      vatAmount: defaultValues?.vatAmount ?? null,
     },
   });
 
@@ -518,6 +520,8 @@ export function ProductForm({
         price: values.price,
         originalPrice: values.originalPrice ?? null,
         stock: values.stock,
+        classificationCode: values.classificationCode ?? null,
+        vatAmount: values.vatAmount ?? null,
       };
       
       // Handle images - filter out empty URLs and uploading placeholders
@@ -794,6 +798,56 @@ export function ProductForm({
                     {...field}
                     onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
                   />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <FormField
+            control={form.control}
+            name="classificationCode"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="text-muted-foreground">Барааны ангилалын код (заавал биш)</FormLabel>
+                <FormControl>
+                  <Input
+                    placeholder="VARCHAR(50)"
+                    maxLength={50}
+                    value={field.value ?? ''}
+                    onChange={(e) => field.onChange(e.target.value === '' ? null : e.target.value)}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="vatAmount"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="text-muted-foreground">НӨАТ дүн (заавал биш)</FormLabel>
+                <FormControl>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none">
+                      ₮
+                    </span>
+                    <Input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      placeholder="0.00"
+                      className="pl-8"
+                      value={field.value ?? ''}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        field.onChange(v === '' ? null : parseFloat(v) || null);
+                      }}
+                    />
+                  </div>
                 </FormControl>
                 <FormMessage />
               </FormItem>

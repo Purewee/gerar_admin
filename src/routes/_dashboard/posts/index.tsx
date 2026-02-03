@@ -8,7 +8,10 @@ import { fetchPostsOptions } from '@/queries/post/options';
 import { createPost } from '@/queries/post/query';
 import type { PostSchema } from '@/queries/post/type';
 
+const TITLE = 'Нийтлэл | Gerar';
+
 export const Route = createFileRoute('/_dashboard/posts/')({
+  head: () => ({ meta: [{ title: TITLE }] }),
   component: Posts,
 });
 

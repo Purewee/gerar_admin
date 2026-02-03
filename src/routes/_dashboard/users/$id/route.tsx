@@ -27,7 +27,10 @@ import { ArrowLeft, MapPin, ShoppingCart, Package, Heart, Shield } from 'lucide-
 import { useAuth } from '@/lib/auth-context';
 import { toast } from 'sonner';
 
+const TITLE = 'Хэрэглэгч | Gerar';
+
 export const Route = createFileRoute('/_dashboard/users/$id')({
+  head: () => ({ meta: [{ title: TITLE }] }),
   component: UserDetailPage,
   loader: ({ params }) => {
     return { userId: Number(params.id) };

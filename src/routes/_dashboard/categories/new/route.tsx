@@ -5,7 +5,10 @@ import { CategoryForm } from '@/components/forms/category-form';
 import { fetchCategoriesOptions, useCreateCategory } from '@/queries/category/options';
 import { toast } from 'sonner';
 
+const TITLE = 'Шинэ ангилал | Gerar';
+
 export const Route = createFileRoute('/_dashboard/categories/new')({
+  head: () => ({ meta: [{ title: TITLE }] }),
   component: NewCategoryPage,
 });
 

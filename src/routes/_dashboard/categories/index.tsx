@@ -167,7 +167,10 @@ function CategoryTree({
   );
 }
 
+const TITLE = 'Ангилал | Gerar';
+
 export const Route = createFileRoute('/_dashboard/categories/')({
+  head: () => ({ meta: [{ title: TITLE }] }),
   component: CategoriesPage,
 });
 

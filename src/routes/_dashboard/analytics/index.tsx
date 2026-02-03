@@ -38,7 +38,10 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
+const TITLE = 'Аналитик | Gerar';
+
 export const Route = createFileRoute('/_dashboard/analytics/')({
+  head: () => ({ meta: [{ title: TITLE }] }),
   component: AnalyticsPage,
 });
 

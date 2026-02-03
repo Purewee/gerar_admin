@@ -33,7 +33,10 @@ import { toast } from 'sonner';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { Category } from '@/queries/category/type';
 
+const TITLE = 'Ангиллын дараалал | Gerar';
+
 export const Route = createFileRoute('/_dashboard/categories/order')({
+  head: () => ({ meta: [{ title: TITLE }] }),
   component: CategoryOrderPage,
 });
 
