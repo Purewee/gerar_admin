@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
-import { Plus, Edit, Trash2, Search, X, Filter, Image as ImageIcon, Info, Eye, EyeOff, RotateCcw, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, Edit, Trash2, Search, X, Filter, Image as ImageIcon, Info, Eye, EyeOff, RotateCcw, ChevronLeft, ChevronRight, AlertTriangle, PackageX, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
 import { useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -161,7 +161,10 @@ function ProductsPage() {
     setQueryParams(params);
   };
 
-  const { data, isLoading } = useQuery(fetchProductsOptions(queryParams));
+  const { data, isLoading, isFetching } = useQuery({
+    ...fetchProductsOptions(queryParams),
+    placeholderData: (prev) => prev,
+  });
   const products = data?.products ?? [];
   const pagination = data?.pagination;
 
@@ -210,16 +213,6 @@ function ProductsPage() {
         error instanceof Error ? error.message : 'Failed to restore product',
       );
     }
-  };
-
-  const getStockBadge = (stock: number) => {
-    if (stock === 0) {
-      return <Badge variant="destructive">Дууссан</Badge>;
-    }
-    if (stock < 10) {
-      return <Badge variant="secondary">Дуусаж байгаа</Badge>;
-    }
-    return <Badge variant="default">Үлдэгдэл</Badge>;
   };
 
   const formatDate = (dateString: string) => {
@@ -284,6 +277,18 @@ function ProductsPage() {
     setQueryParams((prev) => ({ ...prev, limit: newLimit, page: 1 }));
   };
 
+  type SortColumn = 'name' | 'price' | 'stock' | 'createdAt' | 'updatedAt';
+  const handleSort = (column: SortColumn) => {
+    const newOrder: 'asc' | 'desc' =
+      queryParams.sortBy === column
+        ? (queryParams.sortOrder === 'desc' ? 'asc' : 'desc')
+        : 'desc';
+    const nextForm = { ...searchForm, page: 1, sortBy: column, sortOrder: newOrder };
+    const nextParams = { ...queryParams, page: 1, sortBy: column, sortOrder: newOrder };
+    setSearchForm(nextForm);
+    setQueryParams(nextParams);
+  };
+
   const hasActiveFilters = useMemo(() => {
     return !!(
       queryParams.search?.trim() ||
@@ -302,7 +307,8 @@ function ProductsPage() {
     );
   }, [queryParams]);
 
-  if (isLoading) {
+  // Full-page skeleton only on initial load when we have no data
+  if (isLoading && !data) {
     return (
       <div className="space-y-4">
         <div className="flex items-center justify-between">
@@ -407,7 +413,7 @@ function ProductsPage() {
                 <SelectContent>
                   <SelectItem value="name">Нэр</SelectItem>
                   <SelectItem value="price">Үнэ</SelectItem>
-                  <SelectItem value="stock">Үлдэгдэл тоо</SelectItem>
+                  <SelectItem value="stock">Нөөц</SelectItem>
                   <SelectItem value="createdAt">Үүсгэсэн огноо</SelectItem>
                   <SelectItem value="updatedAt">Шинэчилсэн огноо</SelectItem>
                 </SelectContent>
@@ -564,7 +570,7 @@ function ProductsPage() {
 
                 {/* Stock Range */}
                 <div className="space-y-2">
-                  <Label>Үлдэгдэл тоогоор шигших</Label>
+                  <Label>Нөөцөөр шигших</Label>
                   <div className="flex gap-2">
                     <Input
                       type="number"
@@ -643,15 +649,72 @@ function ProductsPage() {
               Бараа олдсонгүй. Эхлээд бараа нэмээрэй!
             </div>
           ) : (
-            <Table>
+            <div className="relative">
+              {isFetching && (
+                <div className="absolute inset-0 z-10 flex items-center justify-center rounded-md bg-background/60 backdrop-blur-[1px]" aria-hidden>
+                  <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                </div>
+              )}
+              <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-[80px]">Зураг</TableHead>
-                  <TableHead>Нэр</TableHead>
+                  <TableHead>
+                    <button
+                      type="button"
+                      onClick={() => handleSort('name')}
+                      className="inline-flex items-center gap-1.5 font-medium rounded px-2 py-1 -ml-1 cursor-pointer hover:bg-muted/70 focus:outline-none focus:ring-2 focus:ring-ring transition-colors"
+                    >
+                      Нэр
+                      {queryParams.sortBy === 'name' ? (
+                        queryParams.sortOrder === 'desc' ? (
+                          <ArrowDown className="h-4 w-4 shrink-0" />
+                        ) : (
+                          <ArrowUp className="h-4 w-4 shrink-0" />
+                        )
+                      ) : (
+                        <ArrowUpDown className="h-4 w-4 shrink-0 text-muted-foreground/70" />
+                      )}
+                    </button>
+                  </TableHead>
                   <TableHead>Тайлбар</TableHead>
                   <TableHead>Ангилал</TableHead>
-                  <TableHead>Үнэ</TableHead>
-                  <TableHead>Үлдэгдэл тоо</TableHead>
+                  <TableHead>
+                    <button
+                      type="button"
+                      onClick={() => handleSort('price')}
+                      className="inline-flex items-center gap-1.5 font-medium rounded px-2 py-1 -ml-1 cursor-pointer hover:bg-muted/70 focus:outline-none focus:ring-2 focus:ring-ring transition-colors"
+                    >
+                      Үнэ
+                      {queryParams.sortBy === 'price' ? (
+                        queryParams.sortOrder === 'desc' ? (
+                          <ArrowDown className="h-4 w-4 shrink-0" />
+                        ) : (
+                          <ArrowUp className="h-4 w-4 shrink-0" />
+                        )
+                      ) : (
+                        <ArrowUpDown className="h-4 w-4 shrink-0 text-muted-foreground/70" />
+                      )}
+                    </button>
+                  </TableHead>
+                  <TableHead className="text-center">
+                    <button
+                      type="button"
+                      onClick={() => handleSort('stock')}
+                      className="inline-flex items-center gap-1.5 font-medium rounded px-2 py-1 cursor-pointer hover:bg-muted/70 focus:outline-none focus:ring-2 focus:ring-ring transition-colors"
+                    >
+                      Нөөц
+                      {queryParams.sortBy === 'stock' ? (
+                        queryParams.sortOrder === 'desc' ? (
+                          <ArrowDown className="h-4 w-4 shrink-0" />
+                        ) : (
+                          <ArrowUp className="h-4 w-4 shrink-0" />
+                        )
+                      ) : (
+                        <ArrowUpDown className="h-4 w-4 shrink-0 text-muted-foreground/70" />
+                      )}
+                    </button>
+                  </TableHead>
                   <TableHead className="text-right">Үйлдэл</TableHead>
                 </TableRow>
               </TableHeader>
@@ -770,11 +833,24 @@ function ProductsPage() {
                         })()}
                       </TableCell>
                       <TableCell>{formatPrice(product.price)}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <span>{product.stock}</span>
-                          {getStockBadge(product.stock)}
-                        </div>
+                      <TableCell className="text-center">
+                        {product.stock === 0 ? (
+                          <span className="inline-flex items-center gap-1.5 rounded-full bg-destructive/15 px-2.5 py-0.5 text-sm font-medium text-destructive ring-1 ring-destructive/30">
+                            <PackageX className="h-3.5 w-3.5 shrink-0" />
+                            <span>0</span>
+                            <span className="opacity-90">Дууссан</span>
+                          </span>
+                        ) : product.stock < 10 ? (
+                          <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/15 px-2.5 py-0.5 text-sm font-medium text-amber-700 dark:text-amber-400 ring-1 ring-amber-500/30">
+                            <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                            <span>{product.stock}</span>
+                            <span className="opacity-90">Дуусаж байна</span>
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 rounded-full bg-muted/80 px-2.5 py-0.5 text-sm tabular-nums">
+                            {product.stock}
+                          </span>
+                        )}
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
@@ -839,7 +915,8 @@ function ProductsPage() {
                   );
                 })}
               </TableBody>
-            </Table>
+              </Table>
+            </div>
           )}
 
           {/* Pagination */}

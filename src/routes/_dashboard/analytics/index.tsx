@@ -38,7 +38,53 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
+import { getUsers } from '@/queries/user/query';
+import { getProducts } from '@/queries/product/query';
+
 const TITLE = 'Аналитик | Gerar';
+
+function aggregateByDate(
+  data: { createdAt: string }[],
+  startDate: string,
+  endDate: string,
+) {
+  const counts: Record<string, number> = {};
+  
+  // Initialize all dates in range with 0
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  
+  // Safety check to prevent infinite loop if dates are invalid
+  if (isNaN(start.getTime()) || isNaN(end.getTime()) || start > end) {
+    return [];
+  }
+  
+  for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+    const dateStr = d.toISOString().split('T')[0];
+    counts[dateStr] = 0;
+  }
+
+  // Count items
+  data.forEach((item) => {
+    const dateStr = new Date(item.createdAt).toISOString().split('T')[0];
+    if (counts[dateStr] !== undefined) {
+      counts[dateStr]++;
+    }
+  });
+
+  return Object.entries(counts)
+    .map(([date, count]) => ({ date, count }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+}
 
 export const Route = createFileRoute('/_dashboard/analytics/')({
   head: () => ({ meta: [{ title: TITLE }] }),
@@ -169,6 +215,34 @@ function AnalyticsPage() {
     queryKey: ['analytics', 'customers'],
     queryFn: () => getRevenueByCustomer({ limit: 10 }),
   });
+
+  // User registration stats
+  const { data: usersData, isLoading: usersLoading } = useQuery({
+    queryKey: ['analytics', 'users', trendsDateRange],
+    queryFn: () => getUsers({
+      createdAfter: trendsDateRange.startDate,
+      createdBefore: trendsDateRange.endDate,
+      limit: 1000 
+    }),
+  });
+
+  // Product addition stats
+  const { data: productsStatsData, isLoading: productsStatsLoading } = useQuery({
+    queryKey: ['analytics', 'products-stats', trendsDateRange],
+    queryFn: () => getProducts({
+      createdAfter: trendsDateRange.startDate,
+      createdBefore: trendsDateRange.endDate,
+      limit: 1000
+    }),
+  });
+
+  const userTrendData = usersData?.users 
+    ? aggregateByDate(usersData.users, trendsDateRange.startDate, trendsDateRange.endDate)
+    : [];
+    
+  const productTrendData = productsStatsData?.products
+    ? aggregateByDate(productsStatsData.products, trendsDateRange.startDate, trendsDateRange.endDate)
+    : [];
 
   const handleDateRangeSubmit = () => {
     if (dateRange.startDate && dateRange.endDate) {
@@ -348,6 +422,77 @@ function AnalyticsPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Growth Charts */}
+      <div className="grid gap-4 md:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>Хэрэглэгчийн өсөлт</CardTitle>
+            <CardDescription>Шинээр бүртгүүлсэн хэрэглэгчид</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {usersLoading ? (
+              <Skeleton className="h-[300px] w-full" />
+            ) : (
+              <div className="h-[300px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={userTrendData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis 
+                      dataKey="date" 
+                      tickFormatter={(value) => new Date(value).toLocaleDateString()}
+                    />
+                    <YAxis allowDecimals={false} />
+                    <Tooltip 
+                      labelFormatter={(value) => new Date(value).toLocaleDateString()}
+                      formatter={(value: number | undefined) => [value ?? 0, 'Хэрэглэгч']}
+                    />
+                    <Bar dataKey="count" fill="#8884d8" name="Хэрэглэгч" />
+                  </BarChart>
+                </ResponsiveContainer>
+                <div className="mt-4 text-center">
+                   <p className="text-2xl font-bold">{usersData?.users?.length || 0}</p>
+                   <p className="text-sm text-muted-foreground">Нийт бүртгүүлсэн</p>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Бүтээгдэхүүний өсөлт</CardTitle>
+            <CardDescription>Шинээр нэмэгдсэн бүтээгдэхүүнүүд</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {productsStatsLoading ? (
+              <Skeleton className="h-[300px] w-full" />
+            ) : (
+              <div className="h-[300px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={productTrendData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis 
+                      dataKey="date" 
+                      tickFormatter={(value) => new Date(value).toLocaleDateString()}
+                    />
+                    <YAxis allowDecimals={false} />
+                    <Tooltip 
+                      labelFormatter={(value) => new Date(value).toLocaleDateString()}
+                      formatter={(value: number | undefined) => [value ?? 0, 'Бүтээгдэхүүн']}
+                    />
+                    <Bar dataKey="count" fill="#82ca9d" name="Бүтээгдэхүүн" />
+                  </BarChart>
+                </ResponsiveContainer>
+                 <div className="mt-4 text-center">
+                   <p className="text-2xl font-bold">{productsStatsData?.products?.length || 0}</p>
+                   <p className="text-sm text-muted-foreground">Нийт нэмэгдсэн</p>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
 
       <div className="grid gap-4 md:grid-cols-2">
         {/* Top Products */}

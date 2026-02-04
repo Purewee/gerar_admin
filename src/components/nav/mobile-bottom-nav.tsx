@@ -1,16 +1,24 @@
 import { Link, useRouterState } from '@tanstack/react-router';
+import type { LucideIcon } from 'lucide-react';
 import { SquareTerminal, Package, ShoppingCart, Users } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { fetchOrdersSearchOptions } from '@/queries/order/options';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
 
-const items = [
+type NavItem = {
+  title: string;
+  url: string;
+  icon: LucideIcon;
+  showBadge?: boolean;
+};
+
+const items: NavItem[] = [
   { title: 'Самбар', url: '/', icon: SquareTerminal },
   { title: 'Бүтээгдэхүүн', url: '/products', icon: Package },
   { title: 'Захиалга', url: '/orders', icon: ShoppingCart, showBadge: true },
   { title: 'Хэрэглэгчид', url: '/users', icon: Users },
-] as const;
+];
 
 export function MobileBottomNav() {
   const isMobile = useIsMobile();
@@ -54,7 +62,7 @@ export function MobileBottomNav() {
                 />
                 {showBadge && paidCount > 0 && (
                   <span
-                    className="absolute -right-2 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-medium text-destructive-foreground"
+                    className="absolute -right-2 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-medium text-white"
                     aria-label={`${paidCount} Төлөгдсөн захиалга`}
                   >
                     {paidCount > 99 ? '99+' : paidCount}

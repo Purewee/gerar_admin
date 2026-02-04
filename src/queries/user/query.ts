@@ -16,6 +16,8 @@ export interface UserSearchParams {
   role?: 'USER' | 'ADMIN' | 'SUPER_ADMIN';
   page?: number;
   limit?: number;
+  createdAfter?: string;
+  createdBefore?: string;
 }
 
 export const getUsers = async (params?: UserSearchParams): Promise<{
@@ -28,9 +30,9 @@ export const getUsers = async (params?: UserSearchParams): Promise<{
   };
 }> => {
   const { token } = getStoredAuth();
-  
+
   const url = new URL(`${API_BASE_URL}/admin/users`);
-  
+
   if (params) {
     if (params.search) {
       url.searchParams.append('search', params.search);
@@ -43,6 +45,12 @@ export const getUsers = async (params?: UserSearchParams): Promise<{
     }
     if (params.limit !== undefined) {
       url.searchParams.append('limit', String(params.limit));
+    }
+    if (params.createdAfter) {
+      url.searchParams.append('createdAfter', params.createdAfter);
+    }
+    if (params.createdBefore) {
+      url.searchParams.append('createdBefore', params.createdBefore);
     }
   }
 
@@ -67,7 +75,7 @@ export const getUsers = async (params?: UserSearchParams): Promise<{
     clearTimeout(timeoutId);
   } catch (error) {
     clearTimeout(timeoutId);
-    
+
     // Handle abort (timeout)
     if (error instanceof Error && error.name === 'AbortError') {
       throw new Error('Request timeout: The server took longer than 10s to respond.');

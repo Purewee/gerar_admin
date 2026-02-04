@@ -67,7 +67,10 @@ function UsersPage() {
     setQueryParams(params);
   };
 
-  const { data, isLoading } = useQuery(fetchUsersOptions(queryParams));
+  const { data, isLoading, isFetching } = useQuery({
+    ...fetchUsersOptions(queryParams),
+    placeholderData: (prev) => prev,
+  });
   const users = data?.users || [];
   const pagination = data?.pagination;
 
@@ -216,28 +219,34 @@ function UsersPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {isLoading ? (
-            <div className="space-y-3">
-              {[...Array(5)].map((_, i) => (
-                <Skeleton key={i} className="h-16 w-full" />
-              ))}
-            </div>
-          ) : users.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-center">
-              <UserIcon className="h-12 w-12 text-muted-foreground mb-4" />
-              <h3 className="text-lg font-semibold mb-2">Хэрэглэгч олдсонгүй</h3>
-              <p className="text-sm text-muted-foreground mb-4">
-                Хайлтын нөхцөлөөр хэрэглэгч олдсонгүй
-              </p>
-              {hasActiveFilters && (
-                <Button variant="outline" onClick={clearSearch}>
-                  Бүх хэрэглэгчийг харуулах
-                </Button>
-              )}
-            </div>
-          ) : (
-            <div className="rounded-md border">
-              <Table>
+          <div className="relative">
+            {isFetching && (
+              <div className="absolute inset-0 z-10 flex items-center justify-center rounded-md bg-background/60 backdrop-blur-[1px]" aria-hidden>
+                <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+              </div>
+            )}
+            {isLoading && !data ? (
+              <div className="space-y-3">
+                {[...Array(5)].map((_, i) => (
+                  <Skeleton key={i} className="h-16 w-full" />
+                ))}
+              </div>
+            ) : users.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 text-center">
+                <UserIcon className="h-12 w-12 text-muted-foreground mb-4" />
+                <h3 className="text-lg font-semibold mb-2">Хэрэглэгч олдсонгүй</h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Хайлтын нөхцөлөөр хэрэглэгч олдсонгүй
+                </p>
+                {hasActiveFilters && (
+                  <Button variant="outline" onClick={clearSearch}>
+                    Бүх хэрэглэгчийг харуулах
+                  </Button>
+                )}
+              </div>
+            ) : (
+              <div className="rounded-md border">
+                <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>ID</TableHead>
@@ -296,9 +305,10 @@ function UsersPage() {
                     </TableRow>
                   ))}
                 </TableBody>
-              </Table>
-            </div>
-          )}
+                </Table>
+              </div>
+            )}
+          </div>
 
           {/* Pagination */}
           {pagination && pagination.totalPages > 1 && (

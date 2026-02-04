@@ -292,7 +292,10 @@ function OrdersPage() {
     };
   }, [hasStatusFilter, statusFilter, appliedFilters]);
 
-  const searchQuery = useQuery(fetchOrdersSearchOptions(searchFilters));
+  const searchQuery = useQuery({
+    ...fetchOrdersSearchOptions(searchFilters),
+    placeholderData: (prev) => prev,
+  });
 
   const countFiltersPaid = useMemo(
     () => ({
@@ -318,6 +321,7 @@ function OrdersPage() {
   const deliveryStartedCount = deliveryStartedCountQuery.data?.total ?? null;
 
   const isLoading = searchQuery.isLoading;
+  const isFetching = searchQuery.isFetching;
   const searchResult = searchQuery.data;
   const ordersFromSearch: Order[] = searchResult?.orders ?? [];
   const totalFromSearch = searchResult?.total ?? 0;
@@ -524,7 +528,8 @@ function OrdersPage() {
           ? `Захиалга #${pendingOrderId}-ын дэлгэрэнгүй хуудас руу очоод цуцлах үйлдлийг хийж болно.`
           : '';
 
-  if (isLoading) {
+  // Full-page skeleton only on initial load when we have no data
+  if (isLoading && !searchResult) {
     return (
       <div className="space-y-4">
         <div className="flex items-center justify-between">
@@ -857,12 +862,18 @@ function OrdersPage() {
             </CardContent>
           )}
           <CardContent>
-          {displayOrders.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              Захиалга олдсонгүй.
-            </div>
-          ) : (
-            <>
+          <div className="relative">
+            {isFetching && (
+              <div className="absolute inset-0 z-10 flex items-center justify-center rounded-md bg-background/60 backdrop-blur-[1px]" aria-hidden>
+                <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+              </div>
+            )}
+            {displayOrders.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                Захиалга олдсонгүй.
+              </div>
+            ) : (
+              <>
               {/* Mobile: card list – all content and actions visible without horizontal scroll */}
               <div className="space-y-3 md:hidden">
                 {displayOrders.map((order) => (
@@ -930,14 +941,7 @@ function OrdersPage() {
                 </TableHeader>
                 <TableBody>
                 {displayOrders.map((order) => (
-                  <TableRow
-                    key={order.id}
-                    className="cursor-pointer"
-                    onDoubleClick={(e) => {
-                      if ((e.target as HTMLElement).closest('button')) return;
-                      navigate({ to: '/orders/$id', params: { id: order.id } });
-                    }}
-                  >
+                  <TableRow key={order.id}>
                     <TableCell className="font-medium">#{order.id}</TableCell>
                     <TableCell>{order.user?.name ?? order.contactFullName ?? 'Байхгүй'}</TableCell>
                     <TableCell>{order.user?.phoneNumber ?? order.contactPhoneNumber ?? 'Байхгүй'}</TableCell>
@@ -966,8 +970,9 @@ function OrdersPage() {
               </TableBody>
               </Table>
               </div>
-            </>
-          )}
+              </>
+            )}
+          </div>
           {totalPagesFromSearch > 1 && (
             <div className="mt-4 flex flex-wrap items-center justify-between gap-4 border-t pt-4">
               <div className="flex items-center gap-4">
