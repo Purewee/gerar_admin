@@ -43,6 +43,8 @@ export const CreateProductSchema = z.object({
   images: z.array(z.string().url('Each image must be a valid URL')).optional(),
   classificationCode: z.string().max(50).nullable().optional(),
   vatAmount: z.number().nullable().optional(),
+  featureIds: z.array(z.number().int().positive()).optional(),
+  featureOrders: z.record(z.string(), z.number()).optional(),
 }).refine((data) => data.categoryId || (data.categoryIds && data.categoryIds.length > 0), {
   message: 'At least one category is required',
   path: ['categoryIds'],
@@ -64,6 +66,8 @@ export const UpdateProductSchema = z.object({
   isHidden: z.boolean().optional(),
   classificationCode: z.string().max(50).nullable().optional(),
   vatAmount: z.number().nullable().optional(),
+  featureIds: z.array(z.number().int().positive()).optional(),
+  featureOrders: z.record(z.string(), z.number()).optional(),
 });
 
 export const ProductResponseSchema = z.object({

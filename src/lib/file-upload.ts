@@ -1,15 +1,19 @@
 import { API_BASE_URL } from './api-config';
 import { getStoredAuth, clearAuth } from './auth-utils';
 
+export type UploadImageType = 'product' | 'banner-desktop' | 'banner-mobile';
+
 /**
  * Upload a single file to the server
  * @param file - The file to upload
  * @param endpoint - Optional custom upload endpoint (defaults to /api/admin/upload)
+ * @param imageType - Optional type for resize dimensions: product (300×300), banner-desktop (1920×600), banner-mobile (768×400)
  * @returns The URL of the uploaded file
  */
 export async function uploadFile(
   file: File,
   endpoint: string = '/admin/upload',
+  imageType?: UploadImageType,
 ): Promise<string> {
   const { token } = getStoredAuth();
 
@@ -32,6 +36,9 @@ export async function uploadFile(
   const formData = new FormData();
   // Backend accepts either 'file' or 'image' field - use only 'file' to avoid duplicate processing
   formData.append('file', file);
+  if (imageType) {
+    formData.append('imageType', imageType);
+  }
 
   const headers: Record<string, string> = {
     Authorization: `Bearer ${token}`,

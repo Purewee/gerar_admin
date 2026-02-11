@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ProductForm } from '@/components/forms/product-form';
 import { fetchCategoriesOptions } from '@/queries/category/options';
+import { fetchFeaturesOptions } from '@/queries/feature/options';
 import { useCreateProduct } from '@/queries/product/options';
 import { toast } from 'sonner';
 
@@ -16,6 +17,7 @@ export const Route = createFileRoute('/_dashboard/products/new')({
 function NewProductPage() {
   const navigate = useNavigate();
   const { data: categories = [] } = useQuery(fetchCategoriesOptions());
+  const { data: features = [] } = useQuery(fetchFeaturesOptions());
   const createProduct = useCreateProduct();
 
   const handleSubmit = async (values: Parameters<typeof createProduct.mutateAsync>[0]) => {
@@ -64,6 +66,7 @@ function NewProductPage() {
         <CardContent>
           <ProductForm
             categories={categories}
+            features={features}
             onSubmit={handleSubmit}
             isLoading={createProduct.isPending}
           />

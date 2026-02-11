@@ -16,6 +16,7 @@ import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import type { Category } from '@/queries/category/type';
+import type { Feature } from '@/queries/feature/type';
 import { CreateProductSchema } from '@/queries/product/type';
 import { uploadFiles, uploadFile, deleteImage } from '@/lib/file-upload';
 import { toast } from 'sonner';
@@ -42,6 +43,7 @@ const parsePriceInput = (value: string): number => {
 
 interface ProductFormProps {
   categories: Category[];
+  features?: Feature[];
   defaultValues?: Partial<ProductFormValues>;
   onSubmit: (values: ProductFormValues) => Promise<void>;
   isLoading?: boolean;
@@ -87,6 +89,7 @@ const organizeCategories = (categories: Category[]): OrganizedCategory[] => {
 
 export function ProductForm({
   categories,
+  features = [],
   defaultValues,
   onSubmit,
   isLoading = false,
@@ -122,6 +125,8 @@ export function ProductForm({
       images: defaultValues?.images || [],
       classificationCode: defaultValues?.classificationCode ?? null,
       vatAmount: defaultValues?.vatAmount ?? null,
+      featureIds: defaultValues?.featureIds || [],
+      featureOrders: defaultValues?.featureOrders ?? undefined,
     },
   });
 
@@ -550,6 +555,16 @@ export function ProductForm({
       if (!cleanedValues.categoryIds && !cleanedValues.categoryId) {
         throw new Error('At least one category is required');
       }
+
+      // Handle features – optional; send array (including []) so update can clear features
+      if (values.featureIds && Array.isArray(values.featureIds)) {
+        cleanedValues.featureIds = values.featureIds.filter(
+          (id): id is number => typeof id === 'number' && id > 0
+        );
+        if (values.featureOrders && Object.keys(values.featureOrders).length > 0) {
+          cleanedValues.featureOrders = values.featureOrders;
+        }
+      }
       
       await onSubmit(cleanedValues);
     } catch (error) {
@@ -961,6 +976,64 @@ export function ProductForm({
             );
           }}
         />
+
+        {features.length > 0 && (
+          <FormField
+            control={form.control}
+            name="featureIds"
+            render={({ field }) => {
+              const selectedFeatureIds = field.value || [];
+              return (
+                <FormItem>
+                  <FormLabel>Онцлох (сонголттой)</FormLabel>
+                  <FormControl>
+                    <div className="max-h-48 overflow-y-auto rounded-lg border bg-card p-3 space-y-2">
+                      {features
+                        .slice()
+                        .sort((a, b) => a.order - b.order)
+                        .map((feature) => (
+                          <div
+                            key={feature.id}
+                            className="flex items-center space-x-3 py-1.5"
+                          >
+                            <Checkbox
+                              id={`feature-${feature.id}`}
+                              checked={selectedFeatureIds.includes(feature.id)}
+                              onCheckedChange={(checked) => {
+                                const current = field.value || [];
+                                if (checked) {
+                                  field.onChange([...current, feature.id]);
+                                } else {
+                                  field.onChange(current.filter((id) => id !== feature.id));
+                                }
+                              }}
+                            />
+                            <Label
+                              htmlFor={`feature-${feature.id}`}
+                              className="flex-1 cursor-pointer text-sm font-normal leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                            >
+                              {feature.name}
+                              {feature.description && (
+                                <span className="text-muted-foreground ml-1">
+                                  — {feature.description}
+                                </span>
+                              )}
+                            </Label>
+                          </div>
+                        ))}
+                    </div>
+                  </FormControl>
+                  <FormMessage />
+                  {selectedFeatureIds.length > 0 && (
+                    <p className="text-sm text-muted-foreground">
+                      {selectedFeatureIds.length} онцлох сонгогдсон
+                    </p>
+                  )}
+                </FormItem>
+              );
+            }}
+          />
+        )}
 
         <FormField
           control={form.control}

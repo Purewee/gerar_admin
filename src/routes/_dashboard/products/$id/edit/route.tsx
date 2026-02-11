@@ -2,9 +2,8 @@ import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ProductForm } from '@/components/forms/product-form';
-import {
-  fetchCategoriesOptions,
-} from '@/queries/category/options';
+import { fetchCategoriesOptions } from '@/queries/category/options';
+import { fetchFeaturesOptions } from '@/queries/feature/options';
 import {
   fetchProductOptions,
   useUpdateProduct,
@@ -25,6 +24,7 @@ function EditProductPage() {
   const { productId } = Route.useLoaderData();
   const navigate = useNavigate();
   const { data: categories = [] } = useQuery(fetchCategoriesOptions());
+  const { data: features = [] } = useQuery(fetchFeaturesOptions());
   const { data: product, isLoading } = useQuery(fetchProductOptions(productId));
   const updateProduct = useUpdateProduct();
 
@@ -74,6 +74,7 @@ function EditProductPage() {
         <CardContent>
           <ProductForm
             categories={categories}
+            features={features}
             defaultValues={{
               name: product.name,
               description: product.description,
@@ -85,6 +86,8 @@ function EditProductPage() {
               images: product.images || [],
               classificationCode: product.classificationCode ?? null,
               vatAmount: product.vatAmount != null ? Number(product.vatAmount) : null,
+              featureIds: (product as { features?: { id: number }[] }).features?.map(f => f.id) ?? [],
+              featureOrders: (product as { featureOrders?: Record<string, number> }).featureOrders,
             }}
             onSubmit={handleSubmit}
             isLoading={updateProduct.isPending}
