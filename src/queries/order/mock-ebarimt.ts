@@ -4,7 +4,7 @@
  */
 import type { OrderEbarimt } from './type';
 
-export const USE_MOCK_EBARIMT = true;
+export const USE_MOCK_EBARIMT = false;
 
 export const MOCK_EBARIMT: OrderEbarimt = {
   ebarimt_id: "9601787b-c623-4027-b7d1-e1bfbf4e3abb",

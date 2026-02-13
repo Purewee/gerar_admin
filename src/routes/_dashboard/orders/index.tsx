@@ -63,6 +63,31 @@ const TITLE = 'Захиалга | Gerar';
 
 type PendingAction = 'delivery_started' | 'delivered' | 'cancel' | null;
 
+const hasOrderEbarimt = (order: Order) => {
+  const rawOrder = order as Record<string, unknown>;
+  const nestedEbarimt =
+    rawOrder.ebarimt && typeof rawOrder.ebarimt === 'object'
+      ? (rawOrder.ebarimt as Record<string, unknown>)
+      : null;
+  const sources = [rawOrder, nestedEbarimt].filter(Boolean) as Record<string, unknown>[];
+
+  return sources.some(
+    (src) =>
+      !!(
+        src.receiptUrl ||
+        src.receipt_url ||
+        src.ebarimt_qr_data ||
+        src.ebarimtQrData ||
+        src.ebarimt_receipt_id ||
+        src.ebarimtReceiptId ||
+        src.ebarimt_lottery ||
+        src.ebarimtLottery ||
+        src.ebarimtId ||
+        src.ebarimt_id
+      ),
+  );
+};
+
 function OrderRowActions({
   order,
   onOpenConfirm,
@@ -71,6 +96,7 @@ function OrderRowActions({
   onView,
   onPrint,
   isPrintPending,
+  showPrintButton,
 }: {
   order: Order;
   onOpenConfirm: (orderId: string, action: PendingAction) => void;
@@ -79,6 +105,7 @@ function OrderRowActions({
   onView: (orderId: string) => void;
   onPrint: (orderId: string) => void;
   isPrintPending: boolean;
+  showPrintButton: boolean;
 }) {
   return (
     <div className="flex flex-wrap items-center justify-end gap-1 md:flex-nowrap">
@@ -202,24 +229,26 @@ function OrderRowActions({
           <TooltipContent>Цуцлагдсан (админ баталгаажуулсан)</TooltipContent>
         </Tooltip>
       )}
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7 text-muted-foreground hover:text-foreground"
-            onClick={() => onPrint(order.id)}
-            disabled={isPrintPending}
-          >
-            {isPrintPending ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <Printer className="h-3.5 w-3.5" />
-            )}
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>Ебаримт хэвлэх</TooltipContent>
-      </Tooltip>
+      {showPrintButton && (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 text-muted-foreground hover:text-foreground"
+              onClick={() => onPrint(order.id)}
+              disabled={isPrintPending}
+            >
+              {isPrintPending ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Printer className="h-3.5 w-3.5" />
+              )}
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Ебаримт хэвлэх</TooltipContent>
+        </Tooltip>
+      )}
       <Tooltip>
         <TooltipTrigger asChild>
           <Button
@@ -275,6 +304,7 @@ function OrdersPage() {
   const [ebarimtDialogData, setEbarimtDialogData] = useState<OrderEbarimt | null>(null);
   const [ebarimtDialogItems, setEbarimtDialogItems] = useState<OrderItem[]>([]);
   const [ebarimtDialogOrderId, setEbarimtDialogOrderId] = useState<string | null>(null);
+  const [ebarimtDialogOrderTotalAmount, setEbarimtDialogOrderTotalAmount] = useState<number | string | null>(null);
   const [ebarimtReceiverName, setEbarimtReceiverName] = useState<string | null>(null);
   const [ebarimtReceiverPhone, setEbarimtReceiverPhone] = useState<string | null>(null);
   const [ebarimtAddress, setEbarimtAddress] = useState<any>(null);
@@ -432,11 +462,13 @@ function OrdersPage() {
       const order = ordersFromSearch.find((o) => o.id === orderId);
       if (order) {
         setEbarimtDialogItems(order.items);
-        setEbarimtReceiverName(order.user?.name ?? order.contactFullName ?? null);
-        setEbarimtReceiverPhone(order.user?.phoneNumber ?? order.contactPhoneNumber ?? null);
+        setEbarimtDialogOrderTotalAmount(order.totalAmount ?? null);
+        setEbarimtReceiverName(order.contactFullName ?? null);
+        setEbarimtReceiverPhone(order.contactPhoneNumber ?? null);
         setEbarimtAddress(order.address ?? null);
       } else {
         setEbarimtDialogItems([]);
+        setEbarimtDialogOrderTotalAmount(null);
         setEbarimtReceiverName(null);
         setEbarimtReceiverPhone(null);
         setEbarimtAddress(null);
@@ -917,6 +949,7 @@ function OrdersPage() {
                           onView={(id) => navigate({ to: '/orders/$id', params: { id } })}
                           onPrint={handlePrint}
                           isPrintPending={printingOrderId === order.id}
+                          showPrintButton={order.status === 'PAID' && hasOrderEbarimt(order)}
                         />
                       </div>
                     </div>
@@ -963,6 +996,7 @@ function OrdersPage() {
                         onView={(id) => navigate({ to: '/orders/$id', params: { id } })}
                         onPrint={handlePrint}
                         isPrintPending={printingOrderId === order.id}
+                        showPrintButton={order.status === 'PAID' && hasOrderEbarimt(order)}
                       />
                     </TableCell>
                   </TableRow>
@@ -1056,6 +1090,7 @@ function OrdersPage() {
         data={ebarimtDialogData}
         items={ebarimtDialogItems}
         orderId={ebarimtDialogOrderId ?? undefined}
+        orderTotalAmount={ebarimtDialogOrderTotalAmount}
         receiverName={ebarimtReceiverName}
         receiverPhone={ebarimtReceiverPhone}
         address={ebarimtAddress}

@@ -29,10 +29,18 @@ export const UpdateDistrictsRequestSchema = z.object({
   districts: z.record(z.string(), z.number()),
 });
 
+/** HH-HH time slot format, e.g. "10-14", "21-00" */
+const offTimeSlotSchema = z.string().regex(/^\d{2}-\d{2}$/);
+/** YYYY-MM-DD date key for per-date time slots */
+const dateKeySchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+
 /** 0 = Sunday, 1 = Monday, ... 6 = Saturday */
 export const OffDeliveryDatesSchema = z.object({
   offWeekdays: z.array(z.number().min(0).max(6)),
   offDates: z.array(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)),
+  offTimeSlots: z.array(offTimeSlotSchema).optional(),
+  /** Keys: YYYY-MM-DD. Values: arrays of HH-HH slot strings. */
+  offTimeSlotsByDate: z.record(dateKeySchema, z.array(offTimeSlotSchema)).optional(),
 });
 
 export const OffDeliveryDatesResponseSchema = z.object({
@@ -44,6 +52,8 @@ export const OffDeliveryDatesResponseSchema = z.object({
 export const UpdateOffDeliveryDatesRequestSchema = z.object({
   offWeekdays: z.array(z.number().min(0).max(6)),
   offDates: z.array(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)),
+  offTimeSlots: z.array(offTimeSlotSchema).optional(),
+  offTimeSlotsByDate: z.record(dateKeySchema, z.array(offTimeSlotSchema)).optional(),
 });
 
 export type DeliveryTimeSlots = z.infer<typeof DeliveryTimeSlotsSchema>;

@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
-import { Plus, Edit, Trash2, Search, X, Filter, Image as ImageIcon, Info, Eye, EyeOff, RotateCcw, ChevronLeft, ChevronRight, AlertTriangle, PackageX, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
+import { Plus, Edit, Trash2, Search, X, Filter, Image as ImageIcon, Info, Eye, EyeOff, RotateCcw, ChevronLeft, ChevronRight, AlertTriangle, PackageX, ArrowUp, ArrowDown, ArrowUpDown, Copy } from 'lucide-react';
 import { useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -33,10 +33,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { fetchProductsOptions, useDeleteProduct, useHideProduct, useUnhideProduct, useRestoreProduct } from '@/queries/product/options';
+import { fetchProductsOptions, useDeleteProduct, useHideProduct, useUnhideProduct, useRestoreProduct, useCreateProduct } from '@/queries/product/options';
+import { getProduct } from '@/queries/product/query';
 import { fetchCategoriesOptions } from '@/queries/category/options';
 import { toast } from 'sonner';
-import type { Product } from '@/queries/product/type';
+import type { Product, CreateProductRequest } from '@/queries/product/type';
 import type { ProductSearchParams } from '@/queries/product/query';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatPrice } from '@/lib/utils';
@@ -57,6 +58,7 @@ function ProductsPage() {
   const navigate = useNavigate();
   const { data: categories = [] } = useQuery(fetchCategoriesOptions());
   const deleteProduct = useDeleteProduct();
+  const createProduct = useCreateProduct();
   const hideProduct = useHideProduct();
   const unhideProduct = useUnhideProduct();
   const restoreProduct = useRestoreProduct();
@@ -211,6 +213,44 @@ function ProductsPage() {
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : 'Failed to restore product',
+      );
+    }
+  };
+
+  const handleDuplicate = async (product: Product) => {
+    try {
+      const fullProduct = await getProduct(product.id);
+      const categories = fullProduct.categories?.length
+        ? fullProduct.categories
+        : fullProduct.category
+          ? [fullProduct.category]
+          : [];
+      const categoryIds = categories.map((c) => c.id).filter(Boolean);
+      if (categoryIds.length === 0 && fullProduct.categoryId) {
+        categoryIds.push(fullProduct.categoryId);
+      }
+      if (categoryIds.length === 0) {
+        toast.error('Барааны ангилал олдсонгүй. Хуулбарлах боломжгүй.');
+        return;
+      }
+      const payload: CreateProductRequest = {
+        name: `${fullProduct.name} (хуулбар)`,
+        description: (fullProduct.description || '').trim() || 'Тайлбаргүй',
+        price: parseFloat(fullProduct.price) || 0,
+        originalPrice: fullProduct.originalPrice ? parseFloat(fullProduct.originalPrice) : null,
+        stock: fullProduct.stock ?? 0,
+        categoryIds,
+        images: fullProduct.images?.length ? fullProduct.images : undefined,
+        classificationCode: fullProduct.classificationCode ?? undefined,
+        vatAmount: fullProduct.vatAmount != null ? Number(fullProduct.vatAmount) : undefined,
+        featureIds: (fullProduct as { features?: { id: number }[] }).features?.map((f) => f.id),
+        featureOrders: (fullProduct as { featureOrders?: Record<string, number> }).featureOrders,
+      };
+      await createProduct.mutateAsync(payload);
+      toast.success('Бараа амжилттай хуулбарлагдлаа');
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : 'Барааг хуулбарлахад алдаа гарлаа',
       );
     }
   };
@@ -867,18 +907,37 @@ function ProductsPage() {
                             </Button>
                           ) : (
                             <>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() =>
-                                  navigate({
-                                    to: '/products/$id/edit',
-                                    params: { id: String(product.id) },
-                                  })
-                                }
-                              >
-                                <Edit className="h-4 w-4" />
-                              </Button>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() =>
+                                      navigate({
+                                        to: '/products/$id/edit',
+                                        params: { id: String(product.id) },
+                                      })
+                                    }
+                                  >
+                                    <Edit className="h-4 w-4" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Засах</TooltipContent>
+                              </Tooltip>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleDuplicate(product)}
+                                    disabled={createProduct.isPending}
+                                    title="Хуулбарлах"
+                                  >
+                                    <Copy className="h-4 w-4" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Хуулбарлах</TooltipContent>
+                              </Tooltip>
                               {product.isHidden ? (
                                 <Button
                                   variant="ghost"

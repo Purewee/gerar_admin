@@ -529,26 +529,52 @@ function toDateOrNull(iso: string): Date | null {
   }
 }
 
+/** One calendar: each selected date is either full-day off or has specific slots off. */
+type DateEntry = { date: string; fullDay: boolean; slots: string[] };
+
+/** Slot option from delivery time slots: label (e.g. "Өглөө") and value ("10-14"). */
+function getSlotOptions(slotsRecord: Record<string, string> | undefined): { label: string; value: string }[] {
+  if (!slotsRecord) return [];
+  return Object.entries(slotsRecord).map(([name, value]) => ({ label: name, value }));
+}
+
 function OffDeliveryDatesForm() {
   const { data, isLoading } = useQuery(fetchOffDeliveryDatesOptions());
+  const { data: deliverySlotsData } = useQuery(fetchDeliveryTimeSlotsOptions());
   const updateOffDelivery = useUpdateOffDeliveryDates();
   const [offWeekdays, setOffWeekdays] = useState<number[]>([]);
-  const [offDates, setOffDates] = useState<string[]>([]);
+  const [offTimeSlots, setOffTimeSlots] = useState<string[]>([]);
+  const [dateEntries, setDateEntries] = useState<DateEntry[]>([]);
   const [hasChanges, setHasChanges] = useState(false);
   const initializedRef = useRef(false);
 
+  const slotOptions = useMemo(
+    () => getSlotOptions(deliverySlotsData?.slots),
+    [deliverySlotsData],
+  );
+
   const selectedDates = useMemo(
     () =>
-      offDates
-        .map(toDateOrNull)
+      dateEntries
+        .map((e) => toDateOrNull(e.date))
         .filter((d): d is Date => d !== null),
-    [offDates],
+    [dateEntries],
   );
 
   useEffect(() => {
     if (data && !initializedRef.current) {
       setOffWeekdays(data.offWeekdays ?? []);
-      setOffDates(data.offDates ?? []);
+      setOffTimeSlots(data.offTimeSlots ?? []);
+      const offDatesList = data.offDates ?? [];
+      const byDate = data.offTimeSlotsByDate ?? {};
+      const dateSet = new Set<string>([...offDatesList, ...Object.keys(byDate)]);
+      const entries: DateEntry[] = [...dateSet].sort().map((date) => {
+        if (byDate[date]?.length) {
+          return { date, fullDay: false, slots: [...byDate[date]] };
+        }
+        return { date, fullDay: true, slots: [] };
+      });
+      setDateEntries(entries);
       setHasChanges(false);
       initializedRef.current = true;
     }
@@ -562,19 +588,66 @@ function OffDeliveryDatesForm() {
   };
 
   const handleCalendarSelect = (dates: Date[] | undefined) => {
-    const next = (dates ?? []).map((d) => format(d, 'yyyy-MM-dd')).sort();
-    setOffDates(next);
+    const newDateStrings = (dates ?? []).map((d) => format(d, 'yyyy-MM-dd')).sort();
+    const newSet = new Set(newDateStrings);
+    setDateEntries((prev) => {
+      const kept = prev.filter((e) => newSet.has(e.date));
+      const added = newDateStrings.filter((d) => !prev.some((e) => e.date === d));
+      const newEntries = [
+        ...kept,
+        ...added.map((date) => ({ date, fullDay: true, slots: [] as string[] })),
+      ].sort((a, b) => a.date.localeCompare(b.date));
+      return newEntries;
+    });
     setHasChanges(true);
   };
 
   const removeDate = (date: string) => {
-    setOffDates((prev) => prev.filter((d) => d !== date));
+    setDateEntries((prev) => prev.filter((e) => e.date !== date));
+    setHasChanges(true);
+  };
+
+  const setDateEntryFullDay = (date: string, fullDay: boolean) => {
+    setDateEntries((prev) =>
+      prev.map((e) => (e.date === date ? { ...e, fullDay, slots: fullDay ? [] : e.slots } : e)),
+    );
+    setHasChanges(true);
+  };
+
+  const setDateEntrySlot = (date: string, slotValue: string, checked: boolean) => {
+    setDateEntries((prev) =>
+      prev.map((e) => {
+        if (e.date !== date) return e;
+        const next = checked
+          ? [...e.slots, slotValue]
+          : e.slots.filter((s) => s !== slotValue);
+        return { ...e, slots: next };
+      }),
+    );
+    setHasChanges(true);
+  };
+
+  const toggleGlobalOffSlot = (slotValue: string, checked: boolean) => {
+    setOffTimeSlots((prev) =>
+      checked ? [...prev, slotValue] : prev.filter((s) => s !== slotValue),
+    );
     setHasChanges(true);
   };
 
   const handleSave = async () => {
     try {
-      await updateOffDelivery.mutateAsync({ offWeekdays, offDates });
+      const offDatesToSend = dateEntries.filter((e) => e.fullDay).map((e) => e.date);
+      const byDateToSend: Record<string, string[]> = {};
+      dateEntries.forEach((e) => {
+        if (!e.fullDay && e.slots.length > 0) byDateToSend[e.date] = e.slots;
+      });
+      await updateOffDelivery.mutateAsync({
+        offWeekdays,
+        offDates: offDatesToSend,
+        offTimeSlots: offTimeSlots.length > 0 ? offTimeSlots : undefined,
+        offTimeSlotsByDate:
+          Object.keys(byDateToSend).length > 0 ? byDateToSend : undefined,
+      });
       toast.success('Хүргэлтийн амралтын өдрүүд амжилттай шинэчлэгдлээ');
       setHasChanges(false);
       initializedRef.current = false;
@@ -622,9 +695,12 @@ function OffDeliveryDatesForm() {
               </CardDescription>
             </div>
           </div>
-          {(offWeekdays.length > 0 || offDates.length > 0) && (
+          {(offWeekdays.length > 0 ||
+            dateEntries.length > 0 ||
+            offTimeSlots.length > 0) && (
             <Badge variant="secondary" className="shrink-0 font-normal">
-              {offWeekdays.length} долоо хоног, {offDates.length} өдөр
+              {offWeekdays.length} долоо хоног, {dateEntries.length} өдөр
+              {offTimeSlots.length > 0 && `, ${offTimeSlots.length} цаг (үндсэн)`}
             </Badge>
           )}
         </div>
@@ -654,7 +730,7 @@ function OffDeliveryDatesForm() {
 
         <div className="space-y-3">
           <p className="text-sm font-medium text-foreground">
-            Тусгай амралтын өдрүүд (баяр, амралт) — календараас олон өдөр сонгоно
+            Тусгай амралтын өдрүүд (баяр, амралт) — календараас өдөр сонгоод, бүтэн өдөр эсвэл тодорхой цагийн хуваарьгүй болгоно
           </p>
           <div
             className="rdp-root rounded-xl border bg-muted/20 p-4 [--rdp-day_button-height:48px] [--rdp-day_button-width:48px] [--rdp-day-height:50px] [--rdp-day-width:50px] [--rdp-accent-color:#e11d48] [--rdp-accent-background-color:rgba(225,29,72,0.15)]"
@@ -673,29 +749,102 @@ function OffDeliveryDatesForm() {
               }}
             />
           </div>
-          {offDates.length > 0 && (
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-muted-foreground text-xs">Сонгосон:</span>
-              {offDates.map((date) => (
-                <Badge
-                  key={date}
-                  variant="secondary"
-                  className="gap-1 pr-1 font-mono text-xs"
-                >
-                  {date}
-                  <button
-                    type="button"
-                    onClick={() => removeDate(date)}
-                    className="rounded-full p-0.5 hover:bg-muted-foreground/20"
-                    aria-label={`${date} устгах`}
+          {dateEntries.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-xs font-medium text-muted-foreground">
+                Сонгосон өдрүүд — бүтэн өдөр эсвэл зөвхөн тодорхой цагийн хуваарьгүй
+              </p>
+              <div className="flex flex-col gap-2">
+                {dateEntries.map((entry) => (
+                  <div
+                    key={entry.date}
+                    className="flex flex-wrap items-center gap-3 rounded-xl border bg-card p-3"
                   >
-                    <X className="h-3 w-3" />
-                  </button>
-                </Badge>
-              ))}
+                    <span className="font-mono text-sm font-medium">{entry.date}</span>
+                    <label className="flex cursor-pointer items-center gap-2 text-sm">
+                      <Checkbox
+                        checked={entry.fullDay}
+                        onCheckedChange={(c) =>
+                          setDateEntryFullDay(entry.date, c === true)
+                        }
+                        aria-label="Бүтэн өдөр"
+                      />
+                      <span>Бүтэн өдөр</span>
+                    </label>
+                    {!entry.fullDay && slotOptions.length > 0 && (
+                      <div className="flex flex-wrap gap-3 border-l pl-3">
+                        <span className="text-muted-foreground text-xs">
+                          Хүргэлт хийхгүй цаг:
+                        </span>
+                        {slotOptions.map((opt) => (
+                          <label
+                            key={opt.value}
+                            className="flex cursor-pointer items-center gap-1.5 text-sm"
+                          >
+                            <Checkbox
+                              checked={entry.slots.includes(opt.value)}
+                              onCheckedChange={(c) =>
+                                setDateEntrySlot(entry.date, opt.value, c === true)
+                              }
+                              aria-label={opt.label}
+                            />
+                            <span>
+                              {opt.label} ({opt.value})
+                            </span>
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => removeDate(entry.date)}
+                      className="ml-auto h-8 w-8 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                      aria-label={`${entry.date} устгах`}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>
+
+        {slotOptions.length > 0 && (
+          <div className="space-y-3">
+            <p className="text-sm font-medium text-foreground">
+              Үндсэн хүргэлт хийхгүй цагийн хуваарь
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Эдгээр цагийн хуваарьт өдөр бүр хүргэлт идэвхгүй (календараас үл хамааран)
+            </p>
+            <div className="flex flex-wrap gap-4">
+              {slotOptions.map((opt) => (
+                <label
+                  key={opt.value}
+                  className={cn(
+                    'flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors hover:bg-muted/50',
+                    offTimeSlots.includes(opt.value) &&
+                      'border-rose-500/50 bg-rose-500/10',
+                  )}
+                >
+                  <Checkbox
+                    checked={offTimeSlots.includes(opt.value)}
+                    onCheckedChange={(c) =>
+                      toggleGlobalOffSlot(opt.value, c === true)
+                    }
+                    aria-label={opt.label}
+                  />
+                  <span>
+                    {opt.label} ({opt.value})
+                  </span>
+                </label>
+              ))}
+            </div>
+          </div>
+        )}
 
         {hasChanges && (
           <div className="flex justify-end border-t pt-4">

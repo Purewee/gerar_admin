@@ -173,6 +173,9 @@ export const OrderEbarimtSchema = z
     ebarimtQrData: z.string().optional().nullable(),
     ebarimtLottery: z.string().optional().nullable(),
     ebarimtReceiptId: z.string().optional().nullable(),
+    ebarimtAmount: z.string().optional().nullable(),
+    ebarimtVatAmount: z.string().optional().nullable(),
+    ebarimtCityTaxAmount: z.string().optional().nullable(),
   })
   .passthrough();
 export const OrderEbarimtResponseSchema = z.object({
