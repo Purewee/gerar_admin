@@ -1,4 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod';
+import { IconAlertCircle, IconLoader2 } from '@tabler/icons-react';
 import { useNavigate, useSearch } from '@tanstack/react-router';
 import { useForm } from 'react-hook-form';
 import { useState, useEffect } from 'react';
@@ -26,6 +27,7 @@ const loginSchema = z.object({
 
 export function LoginForm() {
   const [isLoading, setIsLoading] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const navigate = useNavigate();
   const { login: setAuth } = useAuth();
   const search = useSearch({ from: '/_public/login/' });
@@ -41,18 +43,23 @@ export function LoginForm() {
   // Show error message if redirected due to admin requirement
   useEffect(() => {
     if (search.error === 'admin_required') {
-      toast.error('Admin access required. Please login with an admin account.');
+      const message = 'Admin access required. Please login with an admin account.';
+      setSubmitError(message);
+      toast.error(message);
     }
   }, [search.error]);
 
   async function onSubmit(values: z.infer<typeof loginSchema>) {
     setIsLoading(true);
+    setSubmitError(null);
     try {
       const response = await login(values);
 
       // Check if user has admin or super admin role
       if (response.data.user.role !== 'ADMIN' && response.data.user.role !== 'SUPER_ADMIN') {
-        toast.error('You do not have admin privileges to access the dashboard.');
+        const message = 'You do not have admin privileges to access the dashboard.';
+        setSubmitError(message);
+        toast.error(message);
         return;
       }
 
@@ -70,9 +77,10 @@ export function LoginForm() {
         navigate({ to: '/', replace: true });
       }
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : 'Login failed. Please try again.',
-      );
+      const message =
+        error instanceof Error ? error.message : 'Login failed. Please try again.';
+      setSubmitError(message);
+      toast.error(message);
     } finally {
       setIsLoading(false);
     }
@@ -82,15 +90,9 @@ export function LoginForm() {
     <Form {...form}>
       <form
         onSubmit={form.handleSubmit(onSubmit)}
-        className="flex flex-col gap-6"
+        className="flex flex-col gap-4"
       >
-        <div className="flex flex-col items-center gap-2 text-center">
-          <h1 className="text-2xl font-bold">Нэвтэрч орох</h1>
-          <p className="text-muted-foreground text-sm text-balance">
-            Мэйл хаяг болон пин кодоо оруулна уу
-          </p>
-        </div>
-        <div className="grid gap-6">
+        <div className="grid gap-4">
           <FormField
             control={form.control}
             name="phoneNumber"
@@ -103,6 +105,7 @@ export function LoginForm() {
                     type="tel"
                     placeholder="12345678"
                     maxLength={8}
+                    disabled={isLoading}
                     {...field}
                     onChange={(e) => {
                       // Only allow digits
@@ -127,6 +130,7 @@ export function LoginForm() {
                     type="password"
                     placeholder="1234"
                     maxLength={4}
+                    disabled={isLoading}
                     {...field}
                     onChange={(e) => {
                       // Only allow digits
@@ -139,8 +143,21 @@ export function LoginForm() {
               </FormItem>
             )}
           />
-          <Button type="submit" disabled={isLoading}>
-            {isLoading ? 'Нэвтэрч байна...' : 'Нэвтрэх'}
+          {submitError && (
+            <div className="flex items-start gap-2 rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+              <IconAlertCircle className="mt-0.5 size-4 shrink-0" />
+              <span>{submitError}</span>
+            </div>
+          )}
+          <Button type="submit" disabled={isLoading} className="w-full">
+            {isLoading ? (
+              <>
+                <IconLoader2 className="size-4 animate-spin" />
+                Нэвтэрч байна...
+              </>
+            ) : (
+              'Нэвтрэх'
+            )}
           </Button>
         </div>
         {/* <div className="text-center text-sm">

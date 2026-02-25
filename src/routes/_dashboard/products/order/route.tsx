@@ -6,6 +6,7 @@ import {
   closestCenter,
   KeyboardSensor,
   PointerSensor,
+  TouchSensor,
   useSensor,
   useSensors,
   type DragEndEvent,
@@ -75,7 +76,7 @@ function SortableProductItem({ product }: SortableProductItemProps) {
       <div
         {...attributes}
         {...listeners}
-        className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground"
+        className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground touch-none p-2 -m-2"
       >
         <GripVertical className="h-5 w-5" />
       </div>
@@ -189,7 +190,17 @@ function ProductOrderPage() {
   }, [productIdsString, selectedCategoryId, fetchedProducts.length]); // Use stable string + length, check hasChanges via ref
 
   const sensors = useSensors(
-    useSensor(PointerSensor),
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(TouchSensor, {
+      activationConstraint: {
+        delay: 200,
+        tolerance: 6,
+      },
+    }),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
     })

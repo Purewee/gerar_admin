@@ -1,5 +1,5 @@
-import { useNavigate } from '@tanstack/react-router';
-import { LogOut } from 'lucide-react';
+import { useNavigate, Link } from '@tanstack/react-router';
+import { LogOut, UserCircle } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 import {
   DropdownMenu,
@@ -89,6 +89,13 @@ export function NavUser({
                 </div>
               </div>
             </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem asChild>
+              <Link to="/profile">
+                <UserCircle />
+                Профайл
+              </Link>
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={handleLogout}>
               <LogOut />

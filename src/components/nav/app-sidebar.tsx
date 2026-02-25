@@ -23,6 +23,24 @@ const data = {
       isActive: false,
     },
     {
+      title: 'Захиалга',
+      url: '/orders',
+      icon: ShoppingCart,
+      isActive: false,
+    },
+    {
+      title: 'Бүтээгдэхүүн',
+      url: '/products',
+      icon: Package,
+      isActive: false,
+    },
+    {
+      title: 'Хэрэглэгчид',
+      url: '/users',
+      icon: Users,
+      isActive: false,
+    },
+    {
       title: 'Аналитик',
       url: '/analytics',
       icon: BarChart3,
@@ -35,12 +53,6 @@ const data = {
       isActive: false,
     },
     {
-      title: 'Бүтээгдэхүүн',
-      url: '/products',
-      icon: Package,
-      isActive: false,
-    },
-    {
       title: 'Баннер',
       url: '/banners',
       icon: Image,
@@ -50,18 +62,6 @@ const data = {
       title: 'Онцлох',
       url: '/features',
       icon: Star,
-      isActive: false,
-    },
-    {
-      title: 'Захиалга',
-      url: '/orders',
-      icon: ShoppingCart,
-      isActive: false,
-    },
-    {
-      title: 'Хэрэглэгчид',
-      url: '/users',
-      icon: Users,
       isActive: false,
     },
     {

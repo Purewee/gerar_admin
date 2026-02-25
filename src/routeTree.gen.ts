@@ -17,6 +17,7 @@ import { Route as DashboardConstantsRouteRouteImport } from './routes/_dashboard
 import { Route as DashboardAboutRouteRouteImport } from './routes/_dashboard/about/route'
 import { Route as PublicLoginIndexRouteImport } from './routes/_public/login/index'
 import { Route as DashboardUsersIndexRouteImport } from './routes/_dashboard/users/index'
+import { Route as DashboardProfileIndexRouteImport } from './routes/_dashboard/profile/index'
 import { Route as DashboardProductsIndexRouteImport } from './routes/_dashboard/products/index'
 import { Route as DashboardPostsIndexRouteImport } from './routes/_dashboard/posts/index'
 import { Route as DashboardOrdersIndexRouteImport } from './routes/_dashboard/orders/index'
@@ -77,6 +78,11 @@ const PublicLoginIndexRoute = PublicLoginIndexRouteImport.update({
 const DashboardUsersIndexRoute = DashboardUsersIndexRouteImport.update({
   id: '/users/',
   path: '/users/',
+  getParentRoute: () => DashboardRouteRoute,
+} as any)
+const DashboardProfileIndexRoute = DashboardProfileIndexRouteImport.update({
+  id: '/profile/',
+  path: '/profile/',
   getParentRoute: () => DashboardRouteRoute,
 } as any)
 const DashboardProductsIndexRoute = DashboardProductsIndexRouteImport.update({
@@ -231,6 +237,7 @@ export interface FileRoutesByFullPath {
   '/orders': typeof DashboardOrdersIndexRoute
   '/posts/': typeof DashboardPostsIndexRoute
   '/products': typeof DashboardProductsIndexRoute
+  '/profile': typeof DashboardProfileIndexRoute
   '/users': typeof DashboardUsersIndexRoute
   '/login': typeof PublicLoginIndexRoute
   '/banners/$id/edit': typeof DashboardBannersIdEditRouteRoute
@@ -259,6 +266,7 @@ export interface FileRoutesByTo {
   '/orders': typeof DashboardOrdersIndexRoute
   '/posts': typeof DashboardPostsIndexRoute
   '/products': typeof DashboardProductsIndexRoute
+  '/profile': typeof DashboardProfileIndexRoute
   '/users': typeof DashboardUsersIndexRoute
   '/login': typeof PublicLoginIndexRoute
   '/banners/$id/edit': typeof DashboardBannersIdEditRouteRoute
@@ -293,6 +301,7 @@ export interface FileRoutesById {
   '/_dashboard/orders/': typeof DashboardOrdersIndexRoute
   '/_dashboard/posts/': typeof DashboardPostsIndexRoute
   '/_dashboard/products/': typeof DashboardProductsIndexRoute
+  '/_dashboard/profile/': typeof DashboardProfileIndexRoute
   '/_dashboard/users/': typeof DashboardUsersIndexRoute
   '/_public/login/': typeof PublicLoginIndexRoute
   '/_dashboard/banners/$id/edit': typeof DashboardBannersIdEditRouteRoute
@@ -326,6 +335,7 @@ export interface FileRouteTypes {
     | '/orders'
     | '/posts/'
     | '/products'
+    | '/profile'
     | '/users'
     | '/login'
     | '/banners/$id/edit'
@@ -354,6 +364,7 @@ export interface FileRouteTypes {
     | '/orders'
     | '/posts'
     | '/products'
+    | '/profile'
     | '/users'
     | '/login'
     | '/banners/$id/edit'
@@ -387,6 +398,7 @@ export interface FileRouteTypes {
     | '/_dashboard/orders/'
     | '/_dashboard/posts/'
     | '/_dashboard/products/'
+    | '/_dashboard/profile/'
     | '/_dashboard/users/'
     | '/_public/login/'
     | '/_dashboard/banners/$id/edit'
@@ -458,6 +470,13 @@ declare module '@tanstack/react-router' {
       path: '/users'
       fullPath: '/users'
       preLoaderRoute: typeof DashboardUsersIndexRouteImport
+      parentRoute: typeof DashboardRouteRoute
+    }
+    '/_dashboard/profile/': {
+      id: '/_dashboard/profile/'
+      path: '/profile'
+      fullPath: '/profile'
+      preLoaderRoute: typeof DashboardProfileIndexRouteImport
       parentRoute: typeof DashboardRouteRoute
     }
     '/_dashboard/products/': {
@@ -681,6 +700,7 @@ interface DashboardRouteRouteChildren {
   DashboardFeaturesIndexRoute: typeof DashboardFeaturesIndexRoute
   DashboardOrdersIndexRoute: typeof DashboardOrdersIndexRoute
   DashboardProductsIndexRoute: typeof DashboardProductsIndexRoute
+  DashboardProfileIndexRoute: typeof DashboardProfileIndexRoute
   DashboardUsersIndexRoute: typeof DashboardUsersIndexRoute
   DashboardBannersIdEditRouteRoute: typeof DashboardBannersIdEditRouteRoute
   DashboardCategoriesIdEditRouteRoute: typeof DashboardCategoriesIdEditRouteRoute
@@ -708,6 +728,7 @@ const DashboardRouteRouteChildren: DashboardRouteRouteChildren = {
   DashboardFeaturesIndexRoute: DashboardFeaturesIndexRoute,
   DashboardOrdersIndexRoute: DashboardOrdersIndexRoute,
   DashboardProductsIndexRoute: DashboardProductsIndexRoute,
+  DashboardProfileIndexRoute: DashboardProfileIndexRoute,
   DashboardUsersIndexRoute: DashboardUsersIndexRoute,
   DashboardBannersIdEditRouteRoute: DashboardBannersIdEditRouteRoute,
   DashboardCategoriesIdEditRouteRoute: DashboardCategoriesIdEditRouteRoute,

@@ -21,7 +21,7 @@ import {
   TableCell,
   TableHead,
   TableHeader,
-  TableRow,
+  TableRow, 
 } from '@/components/ui/table';
 import {
   AlertDialog,
@@ -373,12 +373,12 @@ function ProductsPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Бүтээгдэхүүн</h1>
-          <p className="text-muted-foreground">Manage your product catalog</p>
+          <h1 className="text-2xl font-bold sm:text-3xl">Бүтээгдэхүүн</h1>
+          <p className="text-sm text-muted-foreground sm:text-base">Manage your product catalog</p>
         </div>
-        <Button onClick={() => navigate({ to: '/products/new' })}>
+        <Button onClick={() => navigate({ to: '/products/new' })} className="w-full sm:w-auto">
           <Plus className="mr-2 h-4 w-4" />
           Шинэ Бүтээгдэхүүн
         </Button>
@@ -387,16 +387,17 @@ function ProductsPage() {
       {/* Search Section */}
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-2">
-              <Search className="h-5 w-5" />
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+              <Search className="h-5 w-5 shrink-0" />
               Бараанаас хайх
             </CardTitle>
             <div className="flex gap-2">
               {hasActiveFilters && (
                 <Button variant="outline" size="sm" onClick={clearSearch}>
                   <X className="mr-2 h-4 w-4" />
-                  Цэвэрлэх
+                  <span className="hidden xs:inline">Цэвэрлэх</span>
+                  <span className="xs:hidden">X</span>
                 </Button>
               )}
               <Button
@@ -405,14 +406,15 @@ function ProductsPage() {
                 onClick={() => setShowAdvancedSearch(!showAdvancedSearch)}
               >
                 <Filter className="mr-2 h-4 w-4" />
-                Дэлгэрэнгүй {showAdvancedSearch ? 'Нуух' : 'Харуулах'} 
+                <span className="hidden sm:inline">Дэлгэрэнгүй {showAdvancedSearch ? 'Нуух' : 'Харуулах'}</span>
+                <span className="sm:hidden">{showAdvancedSearch ? 'Нуух' : 'Шүүлт'}</span>
               </Button>
             </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Basic Search */}
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3">
             <div className="space-y-2">
               <Label htmlFor="search">Хайх</Label>
               <div className="flex gap-2">
@@ -484,7 +486,7 @@ function ProductsPage() {
           {/* Advanced Search */}
           {showAdvancedSearch && (
             <div className="space-y-4 border-t pt-4">
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
                 {/* Categories */}
                 <div className="space-y-2">
                   <Label>Ангилал</Label>
@@ -695,6 +697,163 @@ function ProductsPage() {
                   <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
                 </div>
               )}
+
+              {/* ===== MOBILE CARD VIEW (< md) ===== */}
+              <div className="md:hidden space-y-3">
+                {products.map((product) => {
+                  const productImage = product.firstImage || product.images?.[0] || null;
+                  const productCategories = product.categories && product.categories.length > 0
+                    ? product.categories
+                    : product.category
+                      ? [product.category]
+                      : [];
+                  return (
+                    <div
+                      key={product.id}
+                      className="flex gap-3 rounded-lg border bg-card p-3 shadow-sm"
+                    >
+                      {/* Image */}
+                      <div className="shrink-0">
+                        {productImage ? (
+                          <div className="relative w-14 h-14 border rounded-md overflow-hidden">
+                            <img
+                              src={productImage}
+                              alt={product.name}
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                const target = e.target as HTMLImageElement;
+                                target.style.display = 'none';
+                              }}
+                            />
+                          </div>
+                        ) : (
+                          <div className="w-14 h-14 border rounded-md flex items-center justify-center bg-muted">
+                            <ImageIcon className="h-5 w-5 text-muted-foreground" />
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Content */}
+                      <div className="flex-1 min-w-0">
+                        {/* Name + badges */}
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className="font-medium text-sm leading-tight break-words">{product.name}</span>
+                          {product.deletedAt && (
+                            <Badge variant="destructive" className="text-[10px] px-1.5 py-0">
+                              Устгасан
+                            </Badge>
+                          )}
+                          {product.isHidden && !product.deletedAt && (
+                            <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                              <EyeOff className="mr-0.5 h-2.5 w-2.5" />
+                              Нуусан
+                            </Badge>
+                          )}
+                        </div>
+
+                        {/* Category */}
+                        {productCategories.length > 0 && (
+                          <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                            {productCategories.map(c => c.name).join(', ')}
+                          </p>
+                        )}
+
+                        {/* Price + Stock row */}
+                        <div className="flex items-center gap-3 mt-1.5">
+                          <span className="text-sm font-semibold">{formatPrice(product.price)}</span>
+                          {product.stock === 0 ? (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-destructive/15 px-2 py-0.5 text-xs font-medium text-destructive ring-1 ring-destructive/30">
+                              <PackageX className="h-3 w-3 shrink-0" />
+                              0
+                            </span>
+                          ) : product.stock < 10 ? (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-xs font-medium text-amber-700 dark:text-amber-400 ring-1 ring-amber-500/30">
+                              <AlertTriangle className="h-3 w-3 shrink-0" />
+                              {product.stock}
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-muted/80 px-2 py-0.5 text-xs tabular-nums">
+                              Нөөц: {product.stock}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Actions */}
+                        <div className="flex items-center gap-1 mt-2 -ml-2">
+                          {product.deletedAt ? (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleRestore(product)}
+                              disabled={restoreProduct.isPending}
+                              className="h-8 w-8 p-0 text-green-600 hover:text-green-700"
+                            >
+                              <RotateCcw className="h-4 w-4" />
+                            </Button>
+                          ) : (
+                            <>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 w-8 p-0"
+                                onClick={() =>
+                                  navigate({
+                                    to: '/products/$id/edit',
+                                    params: { id: String(product.id) },
+                                  })
+                                }
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 w-8 p-0"
+                                onClick={() => handleDuplicate(product)}
+                                disabled={createProduct.isPending}
+                              >
+                                <Copy className="h-4 w-4" />
+                              </Button>
+                              {product.isHidden ? (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-8 w-8 p-0"
+                                  onClick={() => handleUnhide(product)}
+                                  disabled={unhideProduct.isPending}
+                                >
+                                  <EyeOff className="h-4 w-4" />
+                                </Button>
+                              ) : (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-8 w-8 p-0"
+                                  onClick={() => handleHide(product)}
+                                  disabled={hideProduct.isPending}
+                                >
+                                  <Eye className="h-4 w-4" />
+                                </Button>
+                              )}
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 w-8 p-0"
+                                onClick={() => setDeleteTarget(product)}
+                              >
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* ===== DESKTOP TABLE VIEW (md+) ===== */}
+              <div className="hidden md:block">
               <Table>
               <TableHeader>
                 <TableRow>
@@ -717,7 +876,6 @@ function ProductsPage() {
                       )}
                     </button>
                   </TableHead>
-                  <TableHead>Тайлбар</TableHead>
                   <TableHead>Ангилал</TableHead>
                   <TableHead>
                     <button
@@ -823,9 +981,6 @@ function ProductsPage() {
                           )}
                         </div>
                       </TableCell>
-                      <TableCell className="max-w-md truncate">
-                        {product.description}
-                      </TableCell>
                       <TableCell>
                         {(() => {
                           const categories = product.categories && product.categories.length > 0
@@ -838,7 +993,7 @@ function ProductsPage() {
                             return <span className="text-muted-foreground">N/A</span>;
                           }
                           
-                          const displayCount = 1; // Show first category
+                          const displayCount = 1;
                           const displayCategories = categories.slice(0, displayCount);
                           const remainingCount = categories.length - displayCount;
                           
@@ -878,13 +1033,11 @@ function ProductsPage() {
                           <span className="inline-flex items-center gap-1.5 rounded-full bg-destructive/15 px-2.5 py-0.5 text-sm font-medium text-destructive ring-1 ring-destructive/30">
                             <PackageX className="h-3.5 w-3.5 shrink-0" />
                             <span>0</span>
-                            <span className="opacity-90">Дууссан</span>
                           </span>
                         ) : product.stock < 10 ? (
                           <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/15 px-2.5 py-0.5 text-sm font-medium text-amber-700 dark:text-amber-400 ring-1 ring-amber-500/30">
                             <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
                             <span>{product.stock}</span>
-                            <span className="opacity-90">Дуусаж байна</span>
                           </span>
                         ) : (
                           <span className="inline-flex items-center gap-1.5 rounded-full bg-muted/80 px-2.5 py-0.5 text-sm tabular-nums">
@@ -975,37 +1128,41 @@ function ProductsPage() {
                 })}
               </TableBody>
               </Table>
+              </div>
             </div>
           )}
 
           {/* Pagination */}
           {pagination && pagination.totalPages > 1 && (
-            <div className="mt-4 flex flex-wrap items-center justify-between gap-4 border-t pt-4">
-              <div className="flex items-center gap-4">
-                <p className="text-muted-foreground text-sm">
+            <div className="mt-4 flex flex-col gap-3 border-t pt-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-4">
+              <div className="flex flex-wrap items-center gap-2 sm:gap-4">
+                <p className="text-muted-foreground text-xs sm:text-sm">
                   Хуудас {pagination.page} / {pagination.totalPages} (нийт {pagination.total} бараа)
                 </p>
-                <Select
-                  value={String(pagination.limit)}
-                  onValueChange={(v) => handleLimitChange(Number(v))}
-                >
-                  <SelectTrigger className="w-20 h-8 text-sm">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {[10, 20, 50].map((n) => (
-                      <SelectItem key={n} value={String(n)}>
-                        {n}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <span className="text-muted-foreground text-sm">/ хуудас</span>
+                <div className="flex items-center gap-1.5">
+                  <Select
+                    value={String(pagination.limit)}
+                    onValueChange={(v) => handleLimitChange(Number(v))}
+                  >
+                    <SelectTrigger className="w-16 sm:w-20 h-8 text-xs sm:text-sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {[10, 20, 50].map((n) => (
+                        <SelectItem key={n} value={String(n)}>
+                          {n}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <span className="text-muted-foreground text-xs sm:text-sm">/ хуудас</span>
+                </div>
               </div>
-              <div className="flex gap-2">
+              <div className="flex gap-2 w-full sm:w-auto">
                 <Button
                   variant="outline"
                   size="sm"
+                  className="flex-1 sm:flex-none"
                   onClick={() => handlePageChange(Math.max(1, pagination.page - 1))}
                   disabled={pagination.page <= 1}
                 >
@@ -1015,6 +1172,7 @@ function ProductsPage() {
                 <Button
                   variant="outline"
                   size="sm"
+                  className="flex-1 sm:flex-none"
                   onClick={() => handlePageChange(Math.min(pagination.totalPages, pagination.page + 1))}
                   disabled={pagination.page >= pagination.totalPages}
                 >
