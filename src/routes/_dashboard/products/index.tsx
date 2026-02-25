@@ -699,7 +699,7 @@ function ProductsPage() {
               )}
 
               {/* ===== MOBILE CARD VIEW (< md) ===== */}
-              <div className="md:hidden space-y-3">
+              <div className="md:hidden divide-y">
                 {products.map((product) => {
                   const productImage = product.firstImage || product.images?.[0] || null;
                   const productCategories = product.categories && product.categories.length > 0
@@ -710,7 +710,7 @@ function ProductsPage() {
                   return (
                     <div
                       key={product.id}
-                      className="flex gap-3 rounded-lg border bg-card p-3 shadow-sm"
+                      className="flex gap-3 py-3 first:pt-0 last:pb-0"
                     >
                       {/* Image */}
                       <div className="shrink-0">

@@ -907,9 +907,9 @@ function OrdersPage() {
             ) : (
               <>
               {/* Mobile: card list – all content and actions visible without horizontal scroll */}
-              <div className="space-y-3 md:hidden">
+              <div className="divide-y md:hidden">
                 {displayOrders.map((order) => (
-                  <Card key={order.id} className="p-4">
+                  <div key={order.id} className="py-4 first:pt-0 last:pb-0">
                     <div className="space-y-3">
                       <div className="flex items-start justify-between gap-2 flex-wrap">
                         <span className="font-medium">#{order.id}</span>
@@ -953,7 +953,7 @@ function OrdersPage() {
                         />
                       </div>
                     </div>
-                  </Card>
+                  </div>
                 ))}
               </div>
               {/* Desktop: table */}
