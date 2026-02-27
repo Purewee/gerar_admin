@@ -148,6 +148,9 @@ export const OrderEbarimtSchema = z
   .object({
     ebarimtId: z.string().nullable().optional(),
     receiptUrl: z.string().nullable().optional(),
+    /** Delivery fee in MNT (0–50k→5k, 50k–90k→3k, >90k→0). */
+    deliveryFee: z.number().nullable().optional(),
+    delivery_fee: z.number().nullable().optional(),
     /** Full receipt payload (testing / when receipt_url is null) – accept both snake_case and camelCase */
     ebarimt_id: z.string().optional(),
     receipt_url: z.string().nullable().optional(),

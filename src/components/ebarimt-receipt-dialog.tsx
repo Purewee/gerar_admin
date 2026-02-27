@@ -50,6 +50,7 @@ function normalize(data: OrderEbarimt) {
     receiverPhone: data.ebarimt_receiver_phone ?? null,
     ebarimtBy: data.ebarimt_by ?? null,
     paidBy: data.paid_by ?? null,
+    deliveryFee: data.deliveryFee ?? (data as any).delivery_fee ?? null,
     objectType: data.object_type ?? null,
     note: data.note ?? null,
     statusDate: pickStatusDate(),
@@ -273,7 +274,8 @@ export function EbarimtReceiptDialog({
       (orderTotalAmount != null && orderTotalAmount !== '') ||
       (n?.amount != null && n.amount !== '') ||
       (n?.vatAmount != null && n.vatAmount !== '') ||
-      (n?.cityTaxAmount != null && Number(n.cityTaxAmount) !== 0)
+      (n?.cityTaxAmount != null && Number(n.cityTaxAmount) !== 0) ||
+      (n?.deliveryFee != null && Number(n.deliveryFee) > 0)
     );
 
   return (
@@ -370,6 +372,12 @@ export function EbarimtReceiptDialog({
                     <div className="total-row flex justify-between">
                       <span>НӨАТ:</span>
                       <span>{formatMNT(n.vatAmount)}</span>
+                    </div>
+                  )}
+                  {n.deliveryFee != null && Number(n.deliveryFee) > 0 && (
+                    <div className="total-row flex justify-between">
+                      <span>Хүргэлтийн төлбөр:</span>
+                      <span>{formatMNT(n.deliveryFee)}</span>
                     </div>
                   )}
                   {n.amount != null && (

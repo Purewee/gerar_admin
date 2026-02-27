@@ -20,6 +20,7 @@ export const MOCK_EBARIMT: OrderEbarimt = {
   merchant_register_no: "7236945",
   merchant_tin: "30101065006",
   amount: "100.00",
+  deliveryFee: 5000,
   vat_amount: "9.0909",
   city_tax_amount: "0.0000",
   paid_by: "P2P",
