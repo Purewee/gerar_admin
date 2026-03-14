@@ -3,43 +3,40 @@
 # ------------------------------
 FROM node:22-alpine AS builder
 
+# Enable Corepack for native pnpm support
+RUN corepack enable pnpm
+
 # Set working directory
 WORKDIR /app
 
-# Copy package files AND lockfile
-COPY package*.json pnpm-lock.yaml ./
-
-# Install pnpm globally
-RUN npm install -g pnpm
+# Copy package files, lockfile, and workspace/dependency configs
+COPY package*.json pnpm-lock.yaml pnpm-workspace.yaml ./
 
 # Install dependencies using frozen lockfile
 RUN pnpm install --frozen-lockfile
 
-# Copy the rest of the project
+# Copy the rest of the project files
 COPY . .
 
-# Build the app
-RUN npm run build
+# Build the application for production
+RUN pnpm run build
 
 # ------------------------------
-# Runtime stage
+# Runtime stage (Nginx)
 # ------------------------------
-FROM node:22-alpine
+FROM nginx:alpine
 
-# Set working directory
-WORKDIR /app
+# Remove default Nginx static assets
+RUN rm -rf /usr/share/nginx/html/*
 
-# Only copy the build output from the builder
-COPY --from=builder /app/dist ./dist
+# Copy built app from the builder stage
+COPY --from=builder /app/dist /usr/share/nginx/html
 
-# Optional: copy package.json if you want to run scripts
-COPY --from=builder /app/package*.json ./
+# Apply custom Nginx configuration (handles SPA fallback & gzip)
+COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-# Install a minimal server for static files (serve)
-RUN npm install -g serve
+# Expose port 80
+EXPOSE 80
 
-# Expose port 3000
-EXPOSE 3000
-
-# Start the app
-CMD ["serve", "-s", "dist", "-l", "3000"]
+# Start Nginx server
+CMD ["nginx", "-g", "daemon off;"]

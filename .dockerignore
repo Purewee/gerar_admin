@@ -11,6 +11,9 @@ Dockerfile
 node_modules
 npm-debug.log
 
+# Environment
+.env*.local
+
 # Editor
 .idea
 .vscode
