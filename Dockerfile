@@ -3,48 +3,43 @@
 # ------------------------------
 FROM node:22-alpine AS builder
 
-# Install build dependencies for native modules (like SWC and Tailwind Oxide)
-RUN apk add --no-cache libc6-compat
+# Set working directory
+WORKDIR /app
 
-# Enable Corepack for native pnpm support
-RUN corepack enable pnpm
+# Copy package files AND lockfile
+COPY package*.json pnpm-lock.yaml ./
 
-# Set build-time environment variables
-ENV NODE_OPTIONS="--max-old-space-size=4096"
-ENV CI=true
+# Install pnpm globally
+RUN npm install -g pnpm
+
+# Install dependencies using frozen lockfile
+RUN pnpm install --frozen-lockfile
+
+# Copy the rest of the project
+COPY . .
+
+# Build the app
+RUN npm run build
+
+# ------------------------------
+# Runtime stage
+# ------------------------------
+FROM node:22-alpine
 
 # Set working directory
 WORKDIR /app
 
-# Copy package files, lockfile, and workspace/dependency configs
-COPY package*.json pnpm-lock.yaml pnpm-workspace.yaml ./
+# Only copy the build output from the builder
+COPY --from=builder /app/dist ./dist
 
-# Install dependencies using frozen lockfile
-# We skip Husky during build since there is no .git directory
-RUN pnpm install --frozen-lockfile --ignore-scripts=false
+# Optional: copy package.json if you want to run scripts
+COPY --from=builder /app/package*.json ./
 
-# Copy the rest of the project files
-COPY . .
+# Install a minimal server for static files (serve)
+RUN npm install -g serve
 
-# Build the application for production
-RUN pnpm run build
+# Expose port 3000
+EXPOSE 3000
 
-# ------------------------------
-# Runtime stage (Nginx)
-# ------------------------------
-FROM nginx:alpine
-
-# Remove default Nginx static assets
-RUN rm -rf /usr/share/nginx/html/*
-
-# Copy built app from the builder stage
-COPY --from=builder /app/dist /usr/share/nginx/html
-
-# Apply custom Nginx configuration (handles SPA fallback & gzip)
-COPY nginx.conf /etc/nginx/conf.d/default.conf
-
-# Expose port 80
-EXPOSE 80
-
-# Start Nginx server
-CMD ["nginx", "-g", "daemon off;"]
+# Start the app
+CMD ["serve", "-s", "dist", "-l", "3000"]
