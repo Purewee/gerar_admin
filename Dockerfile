@@ -3,8 +3,15 @@
 # ------------------------------
 FROM node:22-alpine AS builder
 
+# Install build dependencies for native modules (like SWC and Tailwind Oxide)
+RUN apk add --no-cache libc6-compat
+
 # Enable Corepack for native pnpm support
 RUN corepack enable pnpm
+
+# Set build-time environment variables
+ENV NODE_OPTIONS="--max-old-space-size=4096"
+ENV CI=true
 
 # Set working directory
 WORKDIR /app
@@ -13,7 +20,8 @@ WORKDIR /app
 COPY package*.json pnpm-lock.yaml pnpm-workspace.yaml ./
 
 # Install dependencies using frozen lockfile
-RUN pnpm install --frozen-lockfile
+# We skip Husky during build since there is no .git directory
+RUN pnpm install --frozen-lockfile --ignore-scripts=false
 
 # Copy the rest of the project files
 COPY . .
