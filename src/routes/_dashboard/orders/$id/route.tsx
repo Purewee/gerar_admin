@@ -44,11 +44,13 @@ const TIMELINE_TITLE_MN: Record<string, string> = {
   'Payment receipt email sent': 'Төлбөрийн баримт имэйл илгээсэн',
   'Status updated': 'Төлөв шинэчлэгдсэн',
   'Delivery started SMS sent': 'Хүргэлт эхэлсэн мэдэгдэл SMS илгээсэн',
+  'Order delivered SMS sent': 'Хүргэгдсэн мэдэгдэл SMS илгээсэн',
   'Cancellation code sent to user': 'Цуцлах код хэрэглэгч рүү илгээсэн',
 };
 /** Map API timeline descriptions (EN) to Mongolian. */
 const TIMELINE_DESC_MN: Record<string, string> = {
   'User notified that delivery has started': 'Хэрэглэгчид хүргэлт эхэлсэн мэдэгдэл өгсөн',
+  'User notified that order has been delivered': 'Хэрэглэгчид захиалга хүргэгдсэн мэдэгдэл өгсөн',
 };
 
 /** Deduplicate: keep only the first ORDER_CREATED (API may return synthetic + DB row). */
@@ -283,7 +285,10 @@ function OrderDetailPage() {
         orderId,
         status,
       });
-      toast.success(`Захиалгын төлөв "${statusLabels[status] ?? status}" болгож шинэчлэгдлээ`);
+      const isSmsSentStatus = status === 'Хүргэгдсэн' || status === 'DELIVERED' || status === STATUS_DELIVERY_STARTED;
+      toast.success(
+        `Захиалгын төлөв "${statusLabels[status] ?? status}" болгож шинэчлэгдлээ${isSmsSentStatus ? ". Хэрэглэгчид SMS илгээгдсэн." : ""}`
+      );
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Төлөв шинэчлэхэд алдаа гарлаа';
       toast.error(errorMessage);

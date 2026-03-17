@@ -529,7 +529,7 @@ function OrdersPage() {
           orderId,
           status: 'Хүргэгдсэн',
         });
-        toast.success('Захиалга амжилттай "Хүргэгдсэн" төлөвт шилжлээ');
+        toast.success('Захиалга амжилттай "Хүргэгдсэн" төлөвт шилжлээ. Хэрэглэгчид SMS илгээгдсэн.');
       } else if (action === 'cancel') {
         navigate({
           to: '/orders/$id',
@@ -555,7 +555,7 @@ function OrdersPage() {
     pendingAction === 'delivery_started'
       ? `Захиалга #${pendingOrderId} хүргэлтэд гарсан гэж тэмдэглэгдэж, хэрэглэгчид SMS илгээгдэнэ.`
       : pendingAction === 'delivered'
-        ? `Захиалга #${pendingOrderId} хүргэгдсэн төлөвт шилжүүлнэ.`
+        ? `Захиалга #${pendingOrderId} хүргэгдсэн төлөвт шилжүүлж, хэрэглэгчид SMS илгээгдэнэ.`
         : pendingAction === 'cancel'
           ? `Захиалга #${pendingOrderId}-ын дэлгэрэнгүй хуудас руу очоод цуцлах үйлдлийг хийж болно.`
           : '';
