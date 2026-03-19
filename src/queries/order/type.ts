@@ -81,6 +81,7 @@ export interface OrderSearchFilters {
   totalMin?: number;
   totalMax?: number;
   deliveryTimeSlot?: string;
+  excludeCancelled?: boolean;
   page?: number;
   limit?: number;
   sortBy?: 'createdAt' | 'updatedAt' | 'totalAmount' | 'status' | 'paymentStatus' | 'deliveryDate';

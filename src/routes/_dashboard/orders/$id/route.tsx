@@ -26,9 +26,29 @@ import { fetchOrderOptions, fetchOrderTimelineOptions, useRequestCancellation, u
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatPrice } from '@/lib/utils';
 import { toast } from 'sonner';
-import { XCircle, ShieldCheck, Truck, PackageCheck, Clock, Mail, MessageSquare, CreditCard, ShoppingCart, ArrowRightCircle } from 'lucide-react';
+import { 
+  XCircle, 
+  ShieldCheck, 
+  Truck, 
+  PackageCheck, 
+  Clock, 
+  Mail, 
+  MessageSquare, 
+  CreditCard, 
+  ShoppingCart, 
+  ArrowRightCircle, 
+  MapPin, 
+  Printer, 
+  Calendar, 
+  User, 
+  ArrowLeft,
+  ChevronRight,
+} from 'lucide-react';
 import { STATUS_DELIVERY_STARTED } from '@/queries/order/type';
 import type { OrderTimelineEvent } from '@/queries/order/type';
+import { EbarimtReceiptDialog } from '@/components/ebarimt-receipt-dialog';
+import { fetchOrderEbarimtOptions } from '@/queries/order/options';
+import { useNavigate } from '@tanstack/react-router';
 
 const DELIVERY_TIME_SLOTS = [
   { value: '10-14', label: '10:00 - 14:00' },
@@ -161,7 +181,15 @@ function OrderDetailPage() {
   
   const [showConfirmRequestDialog, setShowConfirmRequestDialog] = useState(false);
   const [showCancellationDialog, setShowCancellationDialog] = useState(false);
+  const [showEbarimtDialog, setShowEbarimtDialog] = useState(false);
   const [cancellationCode, setCancellationCode] = useState('');
+
+  const navigate = useNavigate();
+
+  const { data: ebarimtData } = useQuery({
+    ...fetchOrderEbarimtOptions(orderId),
+    enabled: !!orderId && order?.status !== 'PENDING' && !order?.status?.startsWith('CANCEL'),
+  });
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleString('mn-MN', {
@@ -203,6 +231,22 @@ function OrderDetailPage() {
   const getStatusLabel = (value: string | null | undefined) => {
     if (value == null || value === '') return null;
     return statusLabels[value] ?? value;
+  };
+
+  const formatAddress = (address: any) => {
+    if (!address) return 'Байхгүй';
+    const parts = [
+      address.provinceOrDistrict,
+      address.khorooOrSoum,
+      address.neighborhood,
+      address.street,
+      address.residentialComplex,
+      address.building && `Барилга ${address.building}`,
+      address.entrance && `Орц ${address.entrance}`,
+      address.apartmentNumber && `Апартамент ${address.apartmentNumber}`,
+    ].filter(Boolean);
+    
+    return parts.length > 0 ? parts.join(', ') : 'Байхгүй';
   };
 
   const getStatusBadge = (status: string) => {
@@ -323,182 +367,308 @@ function OrderDetailPage() {
   }
 
   return (
-    <div className="space-y-4">
-      <div>
-        <h1 className="text-3xl font-bold">Захиалга #{order.id}</h1>
-        <p className="text-muted-foreground">Захиалгын дэлгэрэнгүй мэдээлэл</p>
+    <div className="max-w-7xl mx-auto space-y-6 pb-20">
+      {/* Dynamic Breadcrumbs / Back button */}
+      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+        <Button variant="ghost" size="sm" onClick={() => navigate({ to: '/orders' })} className="h-8 px-2">
+          <ArrowLeft className="h-4 w-4 mr-1" />
+          Захиалгууд
+        </Button>
+        <ChevronRight className="h-4 w-4 opacity-50" />
+        <span className="font-medium text-foreground">Захиалга #{order.id}</span>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Хэрэглэгчийн мэдээлэл</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <div>
-              <span className="text-sm font-medium text-muted-foreground">Нэр:</span>
-              <p className="text-lg">{order.user?.name ?? order.contactFullName ?? "Байхгүй"}</p>
-            </div>
-            <div>
-              <span className="text-sm font-medium text-muted-foreground">Утас:</span>
-              <p className="text-lg">{order.user?.phoneNumber ?? order.contactPhoneNumber ?? "Байхгүй"}</p>
-            </div>
-            {(order.contactEmail ?? undefined) && (
-              <div>
-                <span className="text-sm font-medium text-muted-foreground">Имэйл:</span>
-                <p className="text-lg">{order.contactEmail}</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Захиалгын мэдээлэл</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <div>
-              <span className="text-sm font-medium text-muted-foreground">Төлөв:</span>
-              <div className="mt-1">{getStatusBadge(order.status)}</div>
-            </div>
-            {(order.status === 'PAID' || order.status === 'COMPLETED' || order.status === STATUS_DELIVERY_STARTED) && (
-              <div className="pt-4 border-t space-y-2">
-                {(order.status === 'PAID' || order.status === 'COMPLETED') && (
-                  <Button
-                    variant="outline"
-                    onClick={() => handleUpdateStatus(STATUS_DELIVERY_STARTED)}
-                    disabled={updateOrderStatusMutation.isPending}
-                    className="w-full text-amber-600 hover:text-amber-700 hover:bg-amber-50 hover:border-amber-200"
-                  >
-                    <Truck className="mr-2 h-4 w-4" />
-                    {updateOrderStatusMutation.isPending
-                      ? 'Шинэчлэж байна...'
-                      : 'Хүргэлтэд гарсан'}
-                  </Button>
-                )}
-                <Button
-                  variant="default"
-                  onClick={() => handleUpdateStatus('Хүргэгдсэн')}
-                  disabled={updateOrderStatusMutation.isPending}
-                  className="w-full bg-green-600 text-white hover:bg-green-700 hover:text-white"
-                >
-                  <PackageCheck className="mr-2 h-4 w-4" />
-                  {updateOrderStatusMutation.isPending
-                    ? 'Шинэчлэж байна...'
-                    : 'Хүргэгдсэн болгох'}
-                </Button>
-              </div>
-            )}
-            <div>
-              <span className="text-sm font-medium text-muted-foreground">Хүргэлтийн огноо, цаг:</span>
-              <p className="text-lg">
-                {order.deliveryDate ? (
-                  [formatDeliveryDate(order.deliveryDate), getDeliveryTimeSlotLabel(order.deliveryTimeSlot)].filter(Boolean).join(' · ') || '—'
-                ) : (
-                  '—'
-                )}
-              </p>
-            </div>
-            <div>
-              <span className="text-sm font-medium text-muted-foreground">Үүсгэсэн:</span>
-              <p className="text-lg">{formatDate(order.createdAt)}</p>
-            </div>
-            <div>
-              <span className="text-sm font-medium text-muted-foreground">Сүүлд шинэчлэгдсэн:</span>
-              <p className="text-lg">{formatDate(order.updatedAt)}</p>
-            </div>
-            {canCancelOrder && (
-              <div className="pt-4 border-t">
-                <Button
-                  variant="destructive"
-                  onClick={() => setShowConfirmRequestDialog(true)}
-                  disabled={requestCancellationMutation.isPending}
-                  className="w-full"
-                >
-                  <XCircle className="mr-2 h-4 w-4" />
-                  Захиалга цуцлах
-                </Button>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Clock className="h-5 w-5" />
-            Төлөв өөрчлөлтийн түүх
-          </CardTitle>
-          <CardDescription>
-            Захиалга үүсгэсэн, төлбөр баталгаажсан, мессеж илгээсэн, төлөв өөрчлөлт
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {timelineLoading ? (
-            <ul className="space-y-4">
-              {[1, 2, 3].map((i) => (
-                <li key={i} className="flex gap-3">
-                  <Skeleton className="h-3 w-3 shrink-0 mt-1.5 rounded-full" />
-                  <div className="space-y-1 flex-1">
-                    <Skeleton className="h-4 w-48" />
-                    <Skeleton className="h-3 w-24" />
-                  </div>
-                </li>
-              ))}
-            </ul>
-          ) : timelineEvents.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Түүх байхгүй байна.</p>
-          ) : (
-            <OrderTimeline events={timelineEvents} formatDate={formatDate} getStatusLabel={getStatusLabel} />
-          )}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Захиалгын бараанууд</CardTitle>
-          <CardDescription>Энэ захиалгад {order.items.length} бараа</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Бараа</TableHead>
-                <TableHead>Ангилал</TableHead>
-                <TableHead>Тоо ширхэг</TableHead>
-                <TableHead>Нэгжийн үнэ</TableHead>
-                <TableHead className="text-right">Дэд дүн</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {order.items.map((item) => (
-                <TableRow key={item.id}>
-                  <TableCell className="font-medium">
-                    {item.product?.name || 'Байхгүй'}
-                  </TableCell>
-                  <TableCell>
-                    {item.product?.categories?.[0]?.name ?? item.product?.category?.name ?? 'Байхгүй'}
-                  </TableCell>
-                  <TableCell>{item.quantity}</TableCell>
-                  <TableCell>{formatPrice(item.price)}</TableCell>
-                  <TableCell className="text-right">
-                    {formatPrice(parseFloat(item.price) * item.quantity)}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-          <Separator className="my-4" />
-          <div className="flex justify-end">
-            <div className="space-y-2 text-right">
-              <div className="text-lg font-semibold">
-                Нийт: {formatPrice(order.totalAmount)}
-              </div>
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+        <div className="space-y-1">
+          <div className="flex items-center gap-3">
+            <h1 className="text-3xl font-extrabold tracking-tight">#{order.id}</h1>
+            <div className="animate-in fade-in slide-in-from-left-2 duration-500">
+              {getStatusBadge(order.status)}
             </div>
           </div>
-        </CardContent>
-      </Card>
+          <div className="flex items-center gap-4 text-sm text-muted-foreground">
+            <div className="flex items-center gap-1">
+              <Calendar className="h-3.5 w-3.5" />
+              {formatDate(order.createdAt)}
+            </div>
+            {order.paymentStatus && (
+              <div className="flex items-center gap-1">
+                <CreditCard className="h-3.5 w-3.5" />
+                {order.paymentStatus}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          {ebarimtData && (
+            <Button variant="outline" size="sm" onClick={() => setShowEbarimtDialog(true)}>
+              <Printer className="h-4 w-4 mr-2" />
+              Ебаримт харах
+            </Button>
+          )}
+          {canCancelOrder && (
+            <Button variant="destructive" size="sm" onClick={() => setShowConfirmRequestDialog(true)} disabled={requestCancellationMutation.isPending}>
+              <XCircle className="h-4 w-4 mr-2" />
+              Цуцлах
+            </Button>
+          )}
+        </div>
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-3">
+        {/* Main Content (Left) */}
+        <div className="lg:col-span-2 space-y-6">
+          <Card className="border-none shadow-sm overflow-hidden">
+            <CardHeader className="bg-muted/30 pb-4">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <ShoppingCart className="h-5 w-5 text-primary" />
+                  Захиалгын бараанууд
+                </CardTitle>
+                <Badge variant="outline" className="font-mono">
+                  {order.items.length} бараа
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-muted/10 hover:bg-muted/10">
+                    <TableHead className="w-[45%]">Бараа</TableHead>
+                    <TableHead className="text-center">Тоо</TableHead>
+                    <TableHead>Нэгж үнэ</TableHead>
+                    <TableHead className="text-right">Нийт</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {order.items.map((item) => (
+                    <TableRow key={item.id} className="group transition-colors hover:bg-muted/5">
+                      <TableCell className="py-4">
+                        <div className="flex flex-col">
+                          <span className="font-semibold text-foreground group-hover:text-primary transition-colors">
+                            {item.product?.name || 'Байхгүй'}
+                          </span>
+                          <span className="text-xs text-muted-foreground mt-0.5">
+                            {item.product?.categories?.[0]?.name ?? item.product?.category?.name ?? 'Ангилалгүй'}
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-center font-medium">{item.quantity}</TableCell>
+                      <TableCell className="font-medium whitespace-nowrap">{formatPrice(item.price)}</TableCell>
+                      <TableCell className="text-right font-bold whitespace-nowrap">
+                        {formatPrice(parseFloat(item.price) * item.quantity)}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+              <div className="p-6 bg-muted/20 border-t flex flex-col items-end gap-2">
+                <div className="flex justify-between w-full max-w-[240px] text-sm text-muted-foreground">
+                  <span>Дэд дүн:</span>
+                  <span>{formatPrice(order.totalAmount)}</span>
+                </div>
+                <div className="flex justify-between w-full max-w-[240px] text-lg font-bold border-t pt-2 mt-1">
+                  <span className="text-foreground">Нийт төлөх:</span>
+                  <span className="text-primary">{formatPrice(order.totalAmount)}</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-none shadow-sm">
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Clock className="h-5 w-5 text-primary" />
+                Төлөв өөрчлөлтийн түүх
+              </CardTitle>
+              <CardDescription>Захиалгын явцын дэлгэрэнгүй түүх</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {timelineLoading ? (
+                <div className="space-y-4">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="flex gap-4">
+                      <Skeleton className="h-10 w-10 rounded-full shrink-0" />
+                      <div className="space-y-2 flex-1 pt-1">
+                        <Skeleton className="h-4 w-1/3" />
+                        <Skeleton className="h-3 w-1/4" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : timelineEvents.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-8 text-muted-foreground italic">
+                   Мэдээлэл байхгүй байна
+                </div>
+              ) : (
+                <div className="pl-2 pt-2">
+                  <OrderTimeline events={timelineEvents} formatDate={formatDate} getStatusLabel={getStatusLabel} />
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Sidebar (Right) */}
+        <div className="space-y-6">
+          <Card className="border-none shadow-sm overflow-hidden">
+            <CardHeader className="bg-primary/5 pb-4">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <User className="h-5 w-5 text-primary" />
+                Хэрэглэгч
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4 pt-4">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
+                  {(order.user?.name || order.contactFullName || '?').charAt(0)}
+                </div>
+                <div>
+                  <p className="font-semibold">{order.user?.name ?? order.contactFullName ?? "Байхгүй"}</p>
+                  <p className="text-xs text-muted-foreground">{order.user?.phoneNumber ?? (order.contactPhoneNumber || "Байхгүй")}</p>
+                </div>
+              </div>
+              
+              <Separator className="opacity-50" />
+              
+              <div className="space-y-3">
+                <div className="grid gap-0.5">
+                  <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">Имэйл</span>
+                  <p className="text-sm break-all font-medium">{order.contactEmail || 'Мэдээлэлгүй'}</p>
+                </div>
+                {order.userId && (
+                  <Button variant="outline" size="sm" className="w-full h-8 text-[11px]" onClick={() => navigate({ to: `/users/${order.userId}` })}>
+                    Хэрэглэгчийн профайл
+                  </Button>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {ebarimtData && (
+            <Card className="border-none shadow-sm overflow-hidden bg-primary/5">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-bold flex items-center gap-2 text-primary uppercase tracking-widest">
+                  <Printer className="h-4 w-4" />
+                  Ебаримт
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4 pt-0">
+                <div className="flex flex-col items-center justify-center py-4 bg-white rounded-lg border border-primary/20 shadow-inner">
+                  <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest mb-1">Cугалааны дугаар</span>
+                  <span className="text-3xl font-black text-primary font-mono tracking-tighter">
+                    {(ebarimtData as any).ebarimt_lottery || (ebarimtData as any).ebarimtLottery || '—'}
+                  </span>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-2 text-[11px] px-1">
+                  <div className="flex flex-col">
+                    <span className="text-muted-foreground font-medium">Төлөв:</span>
+                    <span className="font-bold flex items-center gap-1">
+                      <ShieldCheck className="h-3 w-3 text-green-600" />
+                      {(ebarimtData as any).ebarimt_status || (ebarimtData as any).barimt_status || 'Олгосон'}
+                    </span>
+                  </div>
+                  <div className="flex flex-col text-right">
+                    <span className="text-muted-foreground font-medium">ДДТД:</span>
+                    <span className="font-mono truncate" title={(ebarimtData as any).ebarimt_receipt_id || (ebarimtData as any).ebarimtReceiptId}>
+                      {((ebarimtData as any).ebarimt_receipt_id || (ebarimtData as any).ebarimtReceiptId || '—').slice(-8)}
+                    </span>
+                  </div>
+                </div>
+
+                <Button variant="outline" size="sm" className="w-full h-8 text-xs font-bold border-primary/30 hover:bg-primary/10" onClick={() => setShowEbarimtDialog(true)}>
+                  Дэлгэрэнгүй харах
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+
+          <Card className="border-none shadow-sm">
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <MapPin className="h-5 w-5 text-primary" />
+                Хүргэлт
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-1">
+                <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold font-mono">Төлөв</span>
+                <div>{getStatusBadge(order.status)}</div>
+              </div>
+
+              <div className="grid gap-1">
+                <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold font-mono">Цаг хугацаа</span>
+                <p className="text-sm font-medium">
+                  {order.deliveryDate ? (
+                    [formatDeliveryDate(order.deliveryDate), getDeliveryTimeSlotLabel(order.deliveryTimeSlot)].filter(Boolean).join(' · ')
+                  ) : (
+                    <span className="text-muted-foreground italic">Ороогүй</span>
+                  )}
+                </p>
+              </div>
+
+              {order.address ? (
+                <div className="grid gap-1 pt-2 border-t">
+                  <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold font-mono">Хаяг</span>
+                  <p className="text-sm leading-relaxed">{formatAddress(order.address)}</p>
+                  {(order.address as any).addressNote && (
+                    <div className="bg-muted/50 p-2 rounded text-xs italic text-muted-foreground mt-2 border-l-2 border-primary/30">
+                      "{(order.address as any).addressNote}"
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="pt-2 border-t text-xs text-muted-foreground italic">Хаягийн мэдээлэл байхгүй</div>
+              )}
+
+              {/* Status Update Actions */}
+              {(order.status === 'PAID' || order.status === 'COMPLETED' || order.status === STATUS_DELIVERY_STARTED) && (
+                <div className="pt-4 border-t space-y-2">
+                  {(order.status === 'PAID' || order.status === 'COMPLETED') && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleUpdateStatus(STATUS_DELIVERY_STARTED)}
+                      disabled={updateOrderStatusMutation.isPending}
+                      className="w-full justify-start text-amber-600 hover:text-amber-700 hover:bg-amber-50"
+                    >
+                      <Truck className="mr-2 h-4 w-4" />
+                      {updateOrderStatusMutation.isPending ? 'Түр хүлээ...' : 'Хүргэлтэд гаргах'}
+                    </Button>
+                  )}
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={() => handleUpdateStatus('Хүргэгдсэн')}
+                    disabled={updateOrderStatusMutation.isPending}
+                    className="w-full justify-start bg-green-600 hover:bg-green-700"
+                  >
+                    <PackageCheck className="mr-2 h-4 w-4" />
+                    {updateOrderStatusMutation.isPending ? 'Түр хүлээ...' : 'Хүргэлт дуусгах'}
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
+      {/* Ebarimt Dialog with normalized props */}
+      {ebarimtData && (
+        <EbarimtReceiptDialog 
+          open={showEbarimtDialog} 
+          onOpenChange={setShowEbarimtDialog} 
+          data={ebarimtData} 
+          orderId={order.id} 
+          items={order.items}
+          orderTotalAmount={order.totalAmount}
+          receiverName={(order.address as any)?.fullName || order.user?.name || order.contactFullName}
+          receiverPhone={(order.address as any)?.phoneNumber || order.user?.phoneNumber || order.contactPhoneNumber}
+          address={order.address}
+        />
+      )}
 
       {/* Request Cancellation Confirmation Dialog */}
       <Dialog open={showConfirmRequestDialog} onOpenChange={setShowConfirmRequestDialog}>
@@ -534,7 +704,7 @@ function OrderDetailPage() {
               onClick={() => setShowConfirmRequestDialog(false)}
               disabled={requestCancellationMutation.isPending}
             >
-              Цуцлах
+              Буцах
             </Button>
             <Button
               variant="destructive"

@@ -39,7 +39,7 @@ import { USE_MOCK_EBARIMT, MOCK_EBARIMT } from '@/queries/order/mock-ebarimt';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EbarimtReceiptDialog } from '@/components/ebarimt-receipt-dialog';
 import type { Order, OrderSearchFilters, OrderEbarimt, OrderItem } from '@/queries/order/type';
-import { STATUS_DELIVERY_STARTED, STATUS_CANCELLED_BY_ADMIN } from '@/queries/order/type';
+import { STATUS_DELIVERY_STARTED, STATUS_CANCELLED_BY_ADMIN, isOrderCancelled } from '@/queries/order/type';
 import { formatPrice } from '@/lib/utils';
 import { toast } from 'sonner';
 
@@ -291,7 +291,7 @@ const defaultAdvancedFilters: OrderSearchFilters = {
 
 function OrdersPage() {
   const navigate = useNavigate();
-  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<string>('active');
   const [simpleSearch, setSimpleSearch] = useState<string>('');
   const [advancedFilters, setAdvancedFilters] = useState<OrderSearchFilters>(defaultAdvancedFilters);
   const [advancedOpen, setAdvancedOpen] = useState(false);
@@ -309,18 +309,22 @@ function OrdersPage() {
   const [ebarimtReceiverPhone, setEbarimtReceiverPhone] = useState<string | null>(null);
   const [ebarimtAddress, setEbarimtAddress] = useState<any>(null);
 
-  const hasStatusFilter = statusFilter !== 'all';
+
 
   const searchFilters: OrderSearchFilters = useMemo(() => {
+    const isSpecialAll = statusFilter === 'all';
+    const isActiveTab = statusFilter === 'active';
+    
     return {
       ...appliedFilters,
-      status: hasStatusFilter ? statusFilter : undefined,
+      status: (!isSpecialAll && !isActiveTab) ? statusFilter : undefined,
+      excludeCancelled: isActiveTab ? true : undefined,
       page: appliedFilters.page ?? 1,
       limit: Math.min(100, Math.max(1, appliedFilters.limit ?? 20)),
       sortBy: appliedFilters.sortBy ?? 'createdAt',
       sortOrder: (appliedFilters.sortOrder === 'asc' || appliedFilters.sortOrder === 'desc') ? appliedFilters.sortOrder : 'desc',
     };
-  }, [hasStatusFilter, statusFilter, appliedFilters]);
+  }, [statusFilter, appliedFilters]);
 
   const searchQuery = useQuery({
     ...fetchOrdersSearchOptions(searchFilters),
@@ -345,10 +349,45 @@ function OrdersPage() {
     }),
     [appliedFilters],
   );
+  const countFiltersPending = useMemo(
+    () => ({
+      ...appliedFilters,
+      status: 'PENDING',
+      page: 1,
+      limit: 1,
+    }),
+    [appliedFilters],
+  );
+  const countFiltersCancelled = useMemo(
+    () => ({
+      ...appliedFilters,
+      status: 'CANCELLED',
+      page: 1,
+      limit: 1,
+    }),
+    [appliedFilters],
+  );
+  const countFiltersCancelledByAdmin = useMemo(
+    () => ({
+      ...appliedFilters,
+      status: STATUS_CANCELLED_BY_ADMIN,
+      page: 1,
+      limit: 1,
+    }),
+    [appliedFilters],
+  );
+
   const paidCountQuery = useQuery(fetchOrdersSearchOptions(countFiltersPaid));
   const deliveryStartedCountQuery = useQuery(fetchOrdersSearchOptions(countFiltersDeliveryStarted));
+  const pendingCountQuery = useQuery(fetchOrdersSearchOptions(countFiltersPending));
+  const cancelledCountQuery = useQuery(fetchOrdersSearchOptions(countFiltersCancelled));
+  const cancelledByAdminCountQuery = useQuery(fetchOrdersSearchOptions(countFiltersCancelledByAdmin));
+
   const paidCount = paidCountQuery.data?.total ?? null;
   const deliveryStartedCount = deliveryStartedCountQuery.data?.total ?? null;
+  const pendingCount = pendingCountQuery.data?.total ?? null;
+  const cancelledCount = (cancelledCountQuery.data?.total ?? 0) + (cancelledByAdminCountQuery.data?.total ?? 0);
+  const totalCancelled = cancelledCount;
 
   const isLoading = searchQuery.isLoading;
   const isFetching = searchQuery.isFetching;
@@ -358,8 +397,28 @@ function OrdersPage() {
   const pageFromSearch = searchResult?.page ?? 1;
   const totalPagesFromSearch = searchResult?.totalPages ?? 1;
 
-  const displayOrders = ordersFromSearch;
-  const displayTotal = totalFromSearch;
+  const displayOrders = useMemo(() => {
+    if (statusFilter === 'active') {
+       return ordersFromSearch.filter(o => !isOrderCancelled(String(o.status)));
+    }
+    return ordersFromSearch;
+  }, [statusFilter, ordersFromSearch]);
+
+  const displayTotal = useMemo(() => {
+    if (statusFilter === 'active') {
+      return Math.max(0, totalFromSearch - totalCancelled);
+    }
+    return totalFromSearch;
+  }, [statusFilter, totalFromSearch, totalCancelled]);
+
+  const displayTotalPages = useMemo(() => {
+    if (statusFilter === 'active') {
+      const limit = searchFilters.limit ?? 20;
+      return Math.max(1, Math.ceil(displayTotal / limit));
+    }
+    return totalPagesFromSearch;
+  }, [statusFilter, displayTotal, totalPagesFromSearch, searchFilters.limit]);
+
   const updateOrderStatusMutation = useUpdateOrderStatus();
 
   const formatDate = (dateString: string) => {
@@ -398,32 +457,50 @@ function OrdersPage() {
   };
 
   const getStatusBadge = (status: Order['status']) => {
-    const variants = {
-      PENDING: 'secondary',
-      PAID: 'outline',
-      CANCELLED: 'destructive',
-      [STATUS_CANCELLED_BY_ADMIN]: 'destructive',
-      DELIVERED: 'default',
-      [STATUS_DELIVERY_STARTED]: 'outline',
-      'Хүргэгдсэн': 'default', // Handle Mongolian status string from backend
-    } as const;
-    const isPaid = status === 'PAID';
-    const isDeliveryStarted = status === STATUS_DELIVERY_STARTED;
-    const isDeliveredStatus = status === 'DELIVERED' || status === 'Хүргэгдсэн';
+    const statusLower = String(status).toLowerCase();
+    
+    if (status === 'PENDING') {
+      return (
+        <Badge variant="secondary" className="bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700 font-medium">
+          {statusLabels[status] ?? status}
+        </Badge>
+      );
+    }
+    
+    if (status === 'PAID') {
+      return (
+        <Badge className="bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-500/10 dark:text-blue-400 dark:border-blue-500/20 hover:bg-blue-50 dark:hover:bg-blue-500/10 font-medium border">
+          {statusLabels[status] ?? status}
+        </Badge>
+      );
+    }
+    
+    if (status === STATUS_DELIVERY_STARTED) {
+      return (
+        <Badge className="bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-500/10 dark:text-orange-400 dark:border-orange-500/20 hover:bg-orange-50 dark:hover:bg-orange-500/10 font-medium border">
+          {statusLabels[status] ?? status}
+        </Badge>
+      );
+    }
+    
+    if (status === 'DELIVERED' || status === 'Хүргэгдсэн' || statusLower === 'хүргэгдсэн') {
+      return (
+        <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 font-medium border">
+          {statusLabels[status] ?? status}
+        </Badge>
+      );
+    }
+    
+    if (status === 'CANCELLED' || status === STATUS_CANCELLED_BY_ADMIN) {
+      return (
+        <Badge variant="destructive" className="bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-500/10 dark:text-rose-400 dark:border-rose-500/20 hover:bg-rose-50 dark:hover:bg-rose-500/10 font-medium border">
+          {statusLabels[status] ?? status}
+        </Badge>
+      );
+    }
 
     return (
-      <Badge
-        variant={variants[status as keyof typeof variants] || 'secondary'}
-        className={
-          isPaid
-            ? 'border-amber-500 bg-amber-400/20 text-amber-800 dark:bg-amber-500/20 dark:text-amber-200 dark:border-amber-400'
-            : isDeliveryStarted
-              ? 'border-lime-500 bg-lime-400/25 text-lime-800 dark:bg-lime-500/25 dark:text-lime-200 dark:border-lime-400'
-              : isDeliveredStatus
-                ? 'border-green-500 bg-green-500/20 text-green-800 dark:bg-green-500/20 dark:text-green-200 dark:border-green-400'
-                : undefined
-        }
-      >
+      <Badge variant="outline" className="font-medium">
         {statusLabels[status] ?? status}
       </Badge>
     );
@@ -627,10 +704,11 @@ function OrdersPage() {
           </div>
           <div className="flex flex-nowrap gap-3 overflow-x-auto pb-1 md:flex-wrap md:overflow-visible md:pb-0">
             {[
-              { value: 'all', label: 'Бүгд', icon: LayoutList, count: null },
+              { value: 'all', label: 'Бүгд', icon: Search, count: null },
+              { value: 'active', label: 'Идэвхтэй', icon: LayoutList, count: displayTotal && statusFilter !== 'active' ? (totalFromSearch - totalCancelled) : null },
               { value: 'PAID', label: 'Төлөгдсөн', icon: CreditCard, count: paidCount },
               { value: STATUS_DELIVERY_STARTED, label: 'Хүргэлт эхэлсэн', icon: Truck, count: deliveryStartedCount },
-              { value: 'PENDING', label: 'Төлбөр хүлээгдэх', icon: Clock, count: null },
+              { value: 'PENDING', label: 'Төлбөр хүлээгдэх', icon: Clock, count: pendingCount },
               { value: 'CANCELLED', label: 'Цуцлагдсан', icon: XCircle, count: null },
             ].map(({ value, label, icon: Icon, count }) => {
               const isActive = statusFilter === value;
@@ -894,166 +972,170 @@ function OrdersPage() {
             </CardContent>
           )}
           <CardContent>
-          <div className="relative">
-            {isFetching && (
-              <div className="absolute inset-0 z-10 flex items-center justify-center rounded-md bg-background/60 backdrop-blur-[1px]" aria-hidden>
-                <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-              </div>
-            )}
-            {displayOrders.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                Захиалга олдсонгүй.
-              </div>
-            ) : (
-              <>
-              {/* Mobile: card list – all content and actions visible without horizontal scroll */}
-              <div className="divide-y md:hidden">
-                {displayOrders.map((order) => (
-                  <div key={order.id} className="py-4 first:pt-0 last:pb-0">
-                    <div className="space-y-3">
-                      <div className="flex items-start justify-between gap-2 flex-wrap">
-                        <span className="font-medium">#{order.id}</span>
-                        {getStatusBadge(order.status)}
+            <div className="relative">
+              {isFetching && (
+                <div className="absolute inset-0 z-10 flex items-center justify-center rounded-md bg-background/60 backdrop-blur-[1px]" aria-hidden>
+                  <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                </div>
+              )}
+              {displayOrders.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  Захиалга олдсонгүй.
+                </div>
+              ) : (
+                <>
+                  {/* Mobile: card list – all content and actions visible without horizontal scroll */}
+                  <div className="divide-y md:hidden">
+                    {displayOrders.map((order) => (
+                      <div key={order.id} className="py-4 first:pt-0 last:pb-0">
+                        <div className="space-y-3">
+                          <div className="flex items-start justify-between gap-2 flex-wrap">
+                            <span className="font-bold text-lg text-primary">#{order.id}</span>
+                            {getStatusBadge(order.status)}
+                          </div>
+                          <div className="grid gap-1.5 text-sm">
+                            <div>
+                              <span className="text-muted-foreground">Хэрэглэгч:</span>{' '}
+                              {order.user?.name ?? order.contactFullName ?? 'Байхгүй'}
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">Утас:</span>{' '}
+                              {order.user?.phoneNumber ?? order.contactPhoneNumber ?? 'Байхгүй'}
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">Бараа:</span> {order.items.length}
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">Нийт:</span> {formatPrice(order.totalAmount)}
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">Захиалга үүссэн:</span> {formatDate(order.createdAt)}
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">Хүргэлтийн огноо, цаг:</span>{' '}
+                              {order.deliveryDate
+                                ? [formatDeliveryDate(order.deliveryDate), getDeliveryTimeSlotLabel(order.deliveryTimeSlot)].filter(Boolean).join(' · ')
+                                : '—'}
+                            </div>
+                          </div>
+                          <div className="border-t pt-3">
+                            <OrderRowActions
+                              order={order}
+                              onOpenConfirm={openConfirm}
+                              isMutationPending={updateOrderStatusMutation.isPending}
+                              isDelivered={isDelivered}
+                              onView={(id) => navigate({ to: '/orders/$id', params: { id } })}
+                              onPrint={handlePrint}
+                              isPrintPending={printingOrderId === order.id}
+                              showPrintButton={order.status === 'PAID' && hasOrderEbarimt(order)}
+                            />
+                          </div>
+                        </div>
                       </div>
-                      <div className="grid gap-1.5 text-sm">
-                        <div>
-                          <span className="text-muted-foreground">Хэрэглэгч:</span>{' '}
-                          {order.user?.name ?? order.contactFullName ?? 'Байхгүй'}
-                        </div>
-                        <div>
-                          <span className="text-muted-foreground">Утас:</span>{' '}
-                          {order.user?.phoneNumber ?? order.contactPhoneNumber ?? 'Байхгүй'}
-                        </div>
-                        <div>
-                          <span className="text-muted-foreground">Бараа:</span> {order.items.length}
-                        </div>
-                        <div>
-                          <span className="text-muted-foreground">Нийт:</span> {formatPrice(order.totalAmount)}
-                        </div>
-                        <div>
-                          <span className="text-muted-foreground">Захиалга үүссэн:</span> {formatDate(order.createdAt)}
-                        </div>
-                        <div>
-                          <span className="text-muted-foreground">Хүргэлтийн огноо, цаг:</span>{' '}
-                          {order.deliveryDate
-                            ? [formatDeliveryDate(order.deliveryDate), getDeliveryTimeSlotLabel(order.deliveryTimeSlot)].filter(Boolean).join(' · ')
-                            : '—'}
-                        </div>
-                      </div>
-                      <div className="border-t pt-3">
-                        <OrderRowActions
-                          order={order}
-                          onOpenConfirm={openConfirm}
-                          isMutationPending={updateOrderStatusMutation.isPending}
-                          isDelivered={isDelivered}
-                          onView={(id) => navigate({ to: '/orders/$id', params: { id } })}
-                          onPrint={handlePrint}
-                          isPrintPending={printingOrderId === order.id}
-                          showPrintButton={order.status === 'PAID' && hasOrderEbarimt(order)}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              {/* Desktop: table */}
-              <div className="hidden md:block overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0">
-                <Table className="min-w-[800px]">
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Захиалгын ID</TableHead>
-                    <TableHead>Хэрэглэгч</TableHead>
-                    <TableHead>Утас</TableHead>
-                    <TableHead>Бараа</TableHead>
-                    <TableHead>Нийт</TableHead>
-                    <TableHead className="text-center">Төлөв</TableHead>
-                    <TableHead>Захиалга үүссэн</TableHead>
-                    <TableHead>Хүргэлтийн огноо, цаг</TableHead>
-                    <TableHead className="text-right w-0">Үйлдлүүд</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                {displayOrders.map((order) => (
-                  <TableRow key={order.id}>
-                    <TableCell className="font-medium">#{order.id}</TableCell>
-                    <TableCell>{order.user?.name ?? order.contactFullName ?? 'Байхгүй'}</TableCell>
-                    <TableCell>{order.user?.phoneNumber ?? order.contactPhoneNumber ?? 'Байхгүй'}</TableCell>
-                    <TableCell>{order.items.length}</TableCell>
-                    <TableCell>{formatPrice(order.totalAmount)}</TableCell>
-                    <TableCell className="text-center">{getStatusBadge(order.status)}</TableCell>
-                    <TableCell>{formatDate(order.createdAt)}</TableCell>
-                    <TableCell className="whitespace-nowrap">
-                      {order.deliveryDate
-                        ? [formatDeliveryDate(order.deliveryDate), getDeliveryTimeSlotLabel(order.deliveryTimeSlot)].filter(Boolean).join(' · ')
-                        : '—'}
-                    </TableCell>
-                    <TableCell className="text-right w-0">
-                      <OrderRowActions
-                        order={order}
-                        onOpenConfirm={openConfirm}
-                        isMutationPending={updateOrderStatusMutation.isPending}
-                        isDelivered={isDelivered}
-                        onView={(id) => navigate({ to: '/orders/$id', params: { id } })}
-                        onPrint={handlePrint}
-                        isPrintPending={printingOrderId === order.id}
-                        showPrintButton={order.status === 'PAID' && hasOrderEbarimt(order)}
-                      />
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-              </Table>
-              </div>
-              </>
-            )}
-          </div>
-          {totalPagesFromSearch > 1 && (
-            <div className="mt-4 flex flex-wrap items-center justify-between gap-4 border-t pt-4">
-              <div className="flex items-center gap-4">
-                <p className="text-muted-foreground text-sm">
-                  Хуудас {pageFromSearch} / {totalPagesFromSearch} (нийт {totalFromSearch} захиалга)
-                </p>
-                <Select
-                  value={String(appliedFilters.limit ?? 20)}
-                  onValueChange={(v) => setAppliedFilters((prev) => ({ ...prev, limit: Number(v), page: 1 }))}
-                >
-                  <SelectTrigger className="w-20 h-8 text-sm">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {[10, 20, 50, 100].map((n) => (
-                      <SelectItem key={n} value={String(n)}>
-                        {n}
-                      </SelectItem>
                     ))}
-                  </SelectContent>
-                </Select>
-                <span className="text-muted-foreground text-sm">/ хуудас</span>
-              </div>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handlePageChange(Math.max(1, pageFromSearch - 1))}
-                  disabled={pageFromSearch <= 1}
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                  Өмнөх
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handlePageChange(Math.min(totalPagesFromSearch, pageFromSearch + 1))}
-                  disabled={pageFromSearch >= totalPagesFromSearch}
-                >
-                  Дараах
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-              </div>
+                  </div>
+                  {/* Desktop: table */}
+                  <div className="hidden md:block overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0">
+                    <Table className="min-w-[800px]">
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Захиалгын ID</TableHead>
+                          <TableHead>Хэрэглэгч</TableHead>
+                          <TableHead>Утас</TableHead>
+                          <TableHead>Бараа</TableHead>
+                          <TableHead>Нийт</TableHead>
+                          <TableHead className="text-center">Төлөв</TableHead>
+                          <TableHead>Захиалга үүссэн</TableHead>
+                          <TableHead>Хүргэлтийн огноо, цаг</TableHead>
+                          <TableHead className="text-right w-0">Үйлдлүүд</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {displayOrders.map((order) => (
+                          <TableRow key={order.id} className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => navigate({ to: '/orders/$id', params: { id: order.id } })}>
+                            <TableCell className="font-bold text-primary">#{order.id}</TableCell>
+                            <TableCell className="font-medium">{order.user?.name ?? order.contactFullName ?? 'Байхгүй'}</TableCell>
+                            <TableCell className="text-muted-foreground">{order.user?.phoneNumber ?? order.contactPhoneNumber ?? 'Байхгүй'}</TableCell>
+                            <TableCell>
+                              <span className="inline-flex items-center justify-center bg-muted rounded-full w-6 h-6 text-xs font-semibold">
+                                {order.items.length}
+                              </span>
+                            </TableCell>
+                            <TableCell className="font-semibold">{formatPrice(order.totalAmount)}</TableCell>
+                            <TableCell className="text-center">{getStatusBadge(order.status)}</TableCell>
+                            <TableCell className="text-muted-foreground text-sm">{formatDate(order.createdAt)}</TableCell>
+                            <TableCell className="whitespace-nowrap text-sm">
+                              {order.deliveryDate
+                                ? [formatDeliveryDate(order.deliveryDate), getDeliveryTimeSlotLabel(order.deliveryTimeSlot)].filter(Boolean).join(' · ')
+                                : <span className="text-muted-foreground">—</span>}
+                            </TableCell>
+                            <TableCell className="text-right w-0" onClick={(e) => e.stopPropagation()}>
+                              <OrderRowActions
+                                order={order}
+                                onOpenConfirm={openConfirm}
+                                isMutationPending={updateOrderStatusMutation.isPending}
+                                isDelivered={isDelivered}
+                                onView={(id) => navigate({ to: '/orders/$id', params: { id } })}
+                                onPrint={handlePrint}
+                                isPrintPending={printingOrderId === order.id}
+                                showPrintButton={order.status === 'PAID' && hasOrderEbarimt(order)}
+                              />
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </>
+              )}
             </div>
-          )}
-        </CardContent>
-      </Card>
+            {totalPagesFromSearch > 1 && (
+              <div className="mt-4 flex flex-wrap items-center justify-between gap-4 border-t pt-4">
+                <div className="flex items-center gap-4">
+                  <p className="text-muted-foreground text-sm">
+                    Хуудас {pageFromSearch} / {displayTotalPages} (нийт {displayTotal} захиалга)
+                  </p>
+                  <Select
+                    value={String(appliedFilters.limit ?? 20)}
+                    onValueChange={(v) => setAppliedFilters((prev) => ({ ...prev, limit: Number(v), page: 1 }))}
+                  >
+                    <SelectTrigger className="w-20 h-8 text-sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {[10, 20, 50, 100].map((n) => (
+                        <SelectItem key={n} value={String(n)}>
+                          {n}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <span className="text-muted-foreground text-sm">/ хуудас</span>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(Math.max(1, pageFromSearch - 1))}
+                    disabled={pageFromSearch <= 1}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                    Өмнөх
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(Math.min(totalPagesFromSearch, pageFromSearch + 1))}
+                    disabled={pageFromSearch >= totalPagesFromSearch}
+                  >
+                    Дараах
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
 
       <AlertDialog

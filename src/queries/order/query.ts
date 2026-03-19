@@ -32,6 +32,7 @@ function buildOrderSearchParams(filters: OrderSearchFilters): string {
   if (filters.totalMin != null) params.set('totalMin', String(filters.totalMin));
   if (filters.totalMax != null) params.set('totalMax', String(filters.totalMax));
   if (filters.deliveryTimeSlot != null && filters.deliveryTimeSlot !== '') params.set('deliveryTimeSlot', filters.deliveryTimeSlot);
+  if (filters.excludeCancelled === true) params.set('excludeCancelled', 'true');
   const page = filters.page ?? 1;
   const limit = Math.min(Math.max(filters.limit ?? 50, 1), 100);
   params.set('page', String(page));

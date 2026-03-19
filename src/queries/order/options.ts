@@ -1,6 +1,6 @@
 import { queryOptions, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { OrderSearchFilters } from './type';
-import { getAllOrders, getOrder, getOrderTimeline, requestCancellation, confirmCancellation, updateOrderStatus, searchOrders, searchOrdersSimple } from './query';
+import { getAllOrders, getOrder, getOrderTimeline, getOrderEbarimt, requestCancellation, confirmCancellation, updateOrderStatus, searchOrders, searchOrdersSimple } from './query';
 
 function isSimpleSearch(filters: OrderSearchFilters): boolean {
   const term = filters.orderId?.trim() ?? '';
@@ -40,6 +40,14 @@ export function fetchOrderTimelineOptions(orderId: string) {
   return queryOptions({
     queryKey: ['orders', orderId, 'timeline'],
     queryFn: () => getOrderTimeline(orderId),
+  });
+}
+
+export function fetchOrderEbarimtOptions(orderId: string) {
+  return queryOptions({
+    queryKey: ['orders', orderId, 'ebarimt'],
+    queryFn: () => getOrderEbarimt(orderId),
+    retry: false, // Don't spam if receipt not yet generated
   });
 }
 

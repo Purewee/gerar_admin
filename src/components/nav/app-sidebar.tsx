@@ -15,72 +15,76 @@ import { NavUser } from './nav-user';
 import { useAuth } from '@/lib/auth-context';
 
 const data = {
-  navMain: [
+  navGroups: [
     {
-      title: 'Самбар',
-      url: '/',
-      icon: SquareTerminal,
-      isActive: false,
+      label: 'Үндсэн',
+      items: [
+        {
+          title: 'Самбар',
+          url: '/',
+          icon: SquareTerminal,
+        },
+        {
+          title: 'Захиалга',
+          url: '/orders',
+          icon: ShoppingCart,
+        },
+        {
+          title: 'Бүтээгдэхүүн',
+          url: '/products',
+          icon: Package,
+        },
+        {
+          title: 'Хэрэглэгчид',
+          url: '/users',
+          icon: Users,
+        },
+        {
+          title: 'Аналитик',
+          url: '/analytics',
+          icon: BarChart3,
+        },
+      ],
     },
     {
-      title: 'Захиалга',
-      url: '/orders',
-      icon: ShoppingCart,
-      isActive: false,
+      label: 'Контент',
+      items: [
+        {
+          title: 'Ангилал',
+          url: '/categories',
+          icon: FolderTree,
+        },
+        {
+          title: 'Баннер',
+          url: '/banners',
+          icon: Image,
+        },
+        {
+          title: 'Онцлох',
+          url: '/features',
+          icon: Star,
+        },
+      ],
     },
     {
-      title: 'Бүтээгдэхүүн',
-      url: '/products',
-      icon: Package,
-      isActive: false,
-    },
-    {
-      title: 'Хэрэглэгчид',
-      url: '/users',
-      icon: Users,
-      isActive: false,
-    },
-    {
-      title: 'Аналитик',
-      url: '/analytics',
-      icon: BarChart3,
-      isActive: false,
-    },
-    {
-      title: 'Ангилал',
-      url: '/categories',
-      icon: FolderTree,
-      isActive: false,
-    },
-    {
-      title: 'Баннер',
-      url: '/banners',
-      icon: Image,
-      isActive: false,
-    },
-    {
-      title: 'Онцлох',
-      url: '/features',
-      icon: Star,
-      isActive: false,
-    },
-    {
-      title: 'Барааны дараалал',
-      url: '/products/order',
-      icon: ArrowUpDown,
-      isActive: false,
-    },
-    {
-      title: 'Ангиллын дараалал',
-      url: '/categories/order',
-      icon: ArrowUpDown,
-      isActive: false,
-    },
-    {
-      title: 'Тогтмол утгууд',
-      url: '/constants',
-      icon: Settings,
-      isActive: false,
+      label: 'Удирдлага',
+      items: [
+        {
+          title: 'Барааны дараалал',
+          url: '/products/order',
+          icon: ArrowUpDown,
+        },
+        {
+          title: 'Ангиллын дараалал',
+          url: '/categories/order',
+          icon: ArrowUpDown,
+        },
+        {
+          title: 'Тогтмол утгууд',
+          url: '/constants',
+          icon: Settings,
+        },
+      ],
     },
   ],
 };
@@ -103,21 +107,24 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton size="lg" asChild>
-              <Link to="/">
-                <div className="bg-zinc-700 text-sidebar-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg">
-                  <SquareTerminal className="size-4" />
+            <SidebarMenuButton size="lg" asChild className="hover:bg-transparent">
+              <Link to="/" className="flex items-center gap-3">
+                <div className="bg-primary text-primary-foreground flex aspect-square size-9 items-center justify-center rounded-xl shadow-lg shadow-primary/20 transition-transform group-hover:scale-105">
+                  <SquareTerminal className="size-5" />
                 </div>
-                <div className="flex flex-col gap-0.5 leading-none">
-                  <span className="font-medium">Gerar</span>
+                <div className="flex flex-col gap-0.5 leading-none group-data-[collapsible=icon]:hidden">
+                  <span className="text-lg font-bold tracking-tight">Gerar</span>
+                  <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-widest">Admin Panel</span>
                 </div>
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarHeader>
-      <SidebarContent>
-        <NavMain items={data.navMain} />
+      <SidebarContent className="gap-0">
+        {data.navGroups.map((group) => (
+          <NavMain key={group.label} label={group.label} items={group.items} />
+        ))}
       </SidebarContent>
       <SidebarFooter>
         {userInfo && <NavUser user={userInfo} />}
