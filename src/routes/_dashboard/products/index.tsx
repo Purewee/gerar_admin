@@ -1,8 +1,9 @@
-import { createFileRoute, useNavigate } from '@tanstack/react-router';
+import { createFileRoute, useNavigate, Link } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
 import { Plus, Edit, Trash2, Search, X, Filter, Image as ImageIcon, Info, Eye, EyeOff, RotateCcw, ChevronLeft, ChevronRight, AlertTriangle, PackageX, ArrowUp, ArrowDown, ArrowUpDown, Copy } from 'lucide-react';
 import { useState, useMemo } from 'react';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -792,19 +793,16 @@ function ProductsPage() {
                             </Button>
                           ) : (
                             <>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-8 w-8 p-0"
-                                onClick={() =>
-                                  navigate({
-                                    to: '/products/$id/edit',
-                                    params: { id: String(product.id) },
-                                  })
-                                }
+                              <Link
+                                to="/products/$id/edit"
+                                params={{ id: String(product.id) }}
+                                className={cn(
+                                  buttonVariants({ variant: 'ghost', size: 'sm' }),
+                                  'h-8 w-8 p-0 inline-flex items-center justify-center',
+                                )}
                               >
                                 <Edit className="h-4 w-4" />
-                              </Button>
+                              </Link>
                               <Button
                                 variant="ghost"
                                 size="sm"
@@ -982,50 +980,43 @@ function ProductsPage() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        {(() => {
-                          const categories = product.categories && product.categories.length > 0
-                            ? product.categories
-                            : product.category
-                              ? [product.category]
-                              : [];
-                          
-                          if (categories.length === 0) {
-                            return <span className="text-muted-foreground">N/A</span>;
-                          }
-                          
-                          const displayCount = 1;
-                          const displayCategories = categories.slice(0, displayCount);
-                          const remainingCount = categories.length - displayCount;
-                          
-                          return (
-                            <div className="flex items-center gap-1 flex-wrap">
-                              {displayCategories.map((cat, idx) => (
-                                <span key={cat.id || idx} className="text-sm">
-                                  {cat.name}
-                                </span>
-                              ))}
-                              {remainingCount > 0 && (
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <Badge variant="secondary" className="cursor-help text-xs">
-                                      +{remainingCount} {remainingCount === 1 ? 'бусад' : 'бусад'}
-                                    </Badge>
-                                  </TooltipTrigger>
-                                  <TooltipContent>
-                                    <div className="space-y-1">
-                                      <div className="font-semibold text-xs mb-1">Бүх ангилал:</div>
-                                      {categories.map((cat, idx) => (
-                                        <div key={cat.id || idx} className="text-xs">
-                                          {cat.name}
-                                        </div>
-                                      ))}
-                                    </div>
-                                  </TooltipContent>
-                                </Tooltip>
-                              )}
-                            </div>
-                          );
-                        })()}
+                        <div className="flex items-center gap-1 flex-wrap">
+                          {(() => {
+                            const cats = product.categories && product.categories.length > 0
+                              ? product.categories
+                              : product.category
+                                ? [product.category]
+                                : [];
+                            
+                            if (cats.length === 0) return <span className="text-muted-foreground italic">N/A</span>;
+                            
+                            return (
+                              <>
+                                {cats.slice(0, 1).map((cat, idx) => (
+                                  <span key={cat.id || idx} className="text-sm">
+                                    {cat.name}
+                                  </span>
+                                ))}
+                                {cats.length > 1 && (
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Badge variant="secondary" className="cursor-help text-xs">
+                                        +{cats.length - 1} бусад
+                                      </Badge>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <div className="space-y-1 py-1">
+                                        {cats.map((cat, idx) => (
+                                          <div key={cat.id || idx} className="text-xs">{cat.name}</div>
+                                        ))}
+                                      </div>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                )}
+                              </>
+                            );
+                          })()}
+                        </div>
                       </TableCell>
                       <TableCell>{formatPrice(product.price)}</TableCell>
                       <TableCell className="text-center">
@@ -1062,18 +1053,16 @@ function ProductsPage() {
                             <>
                               <Tooltip>
                                 <TooltipTrigger asChild>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() =>
-                                      navigate({
-                                        to: '/products/$id/edit',
-                                        params: { id: String(product.id) },
-                                      })
-                                    }
+                                  <Link
+                                    to="/products/$id/edit"
+                                    params={{ id: String(product.id) }}
+                                    className={cn(
+                                      buttonVariants({ variant: 'ghost', size: 'sm' }),
+                                      'h-9 w-9 inline-flex items-center justify-center cursor-pointer',
+                                    )}
                                   >
                                     <Edit className="h-4 w-4" />
-                                  </Button>
+                                  </Link>
                                 </TooltipTrigger>
                                 <TooltipContent>Засах</TooltipContent>
                               </Tooltip>
