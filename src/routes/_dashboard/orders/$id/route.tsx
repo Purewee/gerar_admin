@@ -43,6 +43,8 @@ import {
   User, 
   ArrowLeft,
   ChevronRight,
+  Coins,
+  Image as ImageIcon,
 } from 'lucide-react';
 import { STATUS_DELIVERY_STARTED } from '@/queries/order/type';
 import type { OrderTimelineEvent } from '@/queries/order/type';
@@ -442,25 +444,72 @@ function OrderDetailPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {order.items.map((item) => (
-                    <TableRow key={item.id} className="group transition-colors hover:bg-muted/5">
-                      <TableCell className="py-4">
-                        <div className="flex flex-col">
-                          <span className="font-semibold text-foreground group-hover:text-primary transition-colors">
-                            {item.product?.name || 'Байхгүй'}
-                          </span>
-                          <span className="text-xs text-muted-foreground mt-0.5">
-                            {item.product?.categories?.[0]?.name ?? item.product?.category?.name ?? 'Ангилалгүй'}
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-center font-medium">{item.quantity}</TableCell>
-                      <TableCell className="font-medium whitespace-nowrap">{formatPrice(item.price)}</TableCell>
-                      <TableCell className="text-right font-bold whitespace-nowrap">
-                        {formatPrice(parseFloat(item.price) * item.quantity)}
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {order.items.map((item) => {
+                    const productInfo = item.product || item.pointProduct;
+                    const itemPoints = Number(item.pointsPrice) || Number(item.pointProduct?.pointsPrice) || 0;
+                    const hasPoints = itemPoints > 0;
+                    const isZeroPrice = parseFloat(item.price) === 0;
+                    const isReward = item.itemType === 'POINT' || 
+                                    item.itemType === 'POINT_PRODUCT' || 
+                                    item.itemType === 'point' || 
+                                    (hasPoints && (isZeroPrice || item.itemType !== 'STANDARD' || !item.product));
+                    
+                    const rawImageUrl = productInfo?.firstImage || (Array.isArray(productInfo?.images) ? productInfo?.images[0] : null);
+                    const imageUrl = typeof rawImageUrl === 'string' && rawImageUrl.trim() !== '' ? rawImageUrl : null;
+                    
+                    return (
+                      <TableRow key={item.id} className="group transition-colors hover:bg-muted/5">
+                        <TableCell className="py-4">
+                          <div className="flex items-center gap-3">
+                            <div className="h-12 w-12 rounded-md border bg-muted/20 overflow-hidden flex-shrink-0 flex items-center justify-center">
+                              {imageUrl ? (
+                                <img src={imageUrl} alt="" className="h-full w-full object-cover" />
+                              ) : (
+                                <ImageIcon className="h-5 w-5 text-muted-foreground" />
+                              )}
+                            </div>
+                            <div className="flex flex-col min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-semibold text-foreground group-hover:text-primary transition-colors truncate">
+                                  {productInfo?.name || 'Байхгүй'}
+                                </span>
+                                {isReward && (
+                                  <Badge variant="secondary" className="bg-yellow-500/10 text-yellow-700 h-5 text-[10px] px-1.5 border-yellow-500/20">
+                                    <Coins className="mr-0.5 h-2.5 w-2.5" />
+                                    Урамшуулал
+                                  </Badge>
+                                )}
+                              </div>
+                              <span className="text-xs text-muted-foreground mt-0.5">
+                                {item.product?.categories?.[0]?.name ?? 
+                                 item.product?.category?.name ?? 
+                                 (isReward ? 'Урамшуулал' : 'Ангилалгүй')}
+                              </span>
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-center font-medium">{item.quantity}</TableCell>
+                        <TableCell className="font-medium whitespace-nowrap">
+                          {isReward ? (
+                            <span className="flex items-center gap-1">
+                              {itemPoints} <Coins className="h-3 w-3 text-yellow-600" />
+                            </span>
+                          ) : (
+                            formatPrice(item.price)
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right font-bold whitespace-nowrap">
+                          {isReward ? (
+                            <span className="flex items-center justify-end gap-1">
+                              {itemPoints * item.quantity} <Coins className="h-3 w-3 text-yellow-600" />
+                            </span>
+                          ) : (
+                            formatPrice(parseFloat(item.price) * item.quantity)
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
               <div className="p-6 bg-muted/20 border-t flex flex-col items-end gap-2">
@@ -468,6 +517,18 @@ function OrderDetailPage() {
                   <span>Дэд дүн:</span>
                   <span>{formatPrice(order.totalAmount)}</span>
                 </div>
+                {order.usedPoints > 0 && (
+                  <div className="flex justify-between w-full max-w-[240px] text-sm text-yellow-700 font-medium">
+                    <span>Ашигласан оноо:</span>
+                    <span className="flex items-center gap-1">-{order.usedPoints} <Coins className="h-3 w-3" /></span>
+                  </div>
+                )}
+                {order.earnedPoints > 0 && (
+                  <div className="flex justify-between w-full max-w-[240px] text-sm text-green-600 font-medium">
+                    <span>{order.status === 'PENDING' ? 'Цуглуулах оноо:' : 'Цуглуулсан оноо:'}</span>
+                    <span className="flex items-center gap-1">+{order.earnedPoints} <Coins className="h-3 w-3" /></span>
+                  </div>
+                )}
                 <div className="flex justify-between w-full max-w-[240px] text-lg font-bold border-t pt-2 mt-1">
                   <span className="text-foreground">Нийт төлөх:</span>
                   <span className="text-primary">{formatPrice(order.totalAmount)}</span>

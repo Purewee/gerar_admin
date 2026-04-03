@@ -10,7 +10,7 @@ const getApiBaseUrl = () => {
 
 	// In development, use localhost
 	if (import.meta.env.DEV) {
-		const url = 'https://v1.gerar.mn/api';
+		const url = 'http://localhost:3000/api';
 		console.log('[API Config] Development mode, using:', url);
 		return url;
 	}

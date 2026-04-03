@@ -286,7 +286,7 @@ const defaultAdvancedFilters: OrderSearchFilters = {
   sortBy: 'createdAt',
   sortOrder: 'desc',
   page: 1,
-  limit: 20,
+  limit: 50,
 };
 
 function OrdersPage() {
@@ -320,7 +320,7 @@ function OrdersPage() {
       status: (!isSpecialAll && !isActiveTab) ? statusFilter : undefined,
       excludeCancelled: isActiveTab ? true : undefined,
       page: appliedFilters.page ?? 1,
-      limit: Math.min(100, Math.max(1, appliedFilters.limit ?? 20)),
+      limit: Math.min(500, Math.max(1, appliedFilters.limit ?? 50)),
       sortBy: appliedFilters.sortBy ?? 'createdAt',
       sortOrder: (appliedFilters.sortOrder === 'asc' || appliedFilters.sortOrder === 'desc') ? appliedFilters.sortOrder : 'desc',
     };
@@ -717,7 +717,10 @@ function OrdersPage() {
                 <button
                   key={value}
                   type="button"
-                  onClick={() => setStatusFilter(value)}
+                  onClick={() => {
+                    setStatusFilter(value);
+                    setAppliedFilters(prev => ({ ...prev, page: 1 }));
+                  }}
                   className={`
                     relative flex shrink-0 flex-col items-center justify-center gap-1.5 rounded-xl border-2 px-4 py-3 text-center transition-colors
                     min-w-[100px] max-w-[120px]
@@ -944,14 +947,14 @@ function OrdersPage() {
                 <div className="space-y-2">
                   <Label>Хуудасны хэмжээ</Label>
                   <Select
-                    value={String(advancedFilters.limit ?? 20)}
+                    value={String(advancedFilters.limit ?? 50)}
                     onValueChange={(v) => setAdvancedFilters((f) => ({ ...f, limit: Number(v), page: 1 }))}
                   >
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {[10, 20, 50, 100].map((n) => (
+                      {[20, 50, 100, 200, 500].map((n) => (
                         <SelectItem key={n} value={String(n)}>
                           {n}
                         </SelectItem>
@@ -1096,14 +1099,14 @@ function OrdersPage() {
                     Хуудас {pageFromSearch} / {displayTotalPages} (нийт {displayTotal} захиалга)
                   </p>
                   <Select
-                    value={String(appliedFilters.limit ?? 20)}
+                    value={String(appliedFilters.limit ?? 50)}
                     onValueChange={(v) => setAppliedFilters((prev) => ({ ...prev, limit: Number(v), page: 1 }))}
                   >
                     <SelectTrigger className="w-20 h-8 text-sm">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {[10, 20, 50, 100].map((n) => (
+                      {[20, 50, 100, 200, 500].map((n) => (
                         <SelectItem key={n} value={String(n)}>
                           {n}
                         </SelectItem>

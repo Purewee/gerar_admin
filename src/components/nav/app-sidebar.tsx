@@ -44,6 +44,11 @@ const data = {
           url: '/analytics',
           icon: BarChart3,
         },
+        {
+          title: 'Лояалти дэлгүүр',
+          url: '/point-products',
+          icon: Star,
+        },
       ],
     },
     {

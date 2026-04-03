@@ -1,6 +1,4 @@
 import { z } from 'zod';
-import { ProductSchema } from '../product/type';
-import { CategorySchema } from '../category/type';
 
 /** Used when admin marks order as out for delivery; backend sends SMS: Таны #<orderId> хүргэлтэд гарлаа. GERAR.MN */
 export const STATUS_DELIVERY_STARTED = 'DELIVERY_STARTED';
@@ -20,10 +18,24 @@ export const OrderItemSchema = z.object({
   productId: z.number(),
   quantity: z.number(),
   price: z.string(),
-  product: ProductSchema.extend({
-    category: CategorySchema.optional(),
-    categories: z.array(CategorySchema).optional(),
-  }).optional(),
+  itemType: z.union([z.enum(['STANDARD', 'POINT', 'POINT_PRODUCT']), z.string()]).default('STANDARD'),
+  pointsPrice: z.union([z.number(), z.string()]).optional().nullable(),
+  product: z.object({
+    name: z.string(),
+    description: z.string().optional().nullable(),
+    price: z.string().optional().nullable(),
+    images: z.array(z.string()).optional().nullable(),
+    firstImage: z.string().optional().nullable(),
+    category: z.any().optional(),
+    categories: z.array(z.any()).optional(),
+  }).passthrough().optional().nullable(),
+  pointProduct: z.object({
+    name: z.string(),
+    description: z.string().optional().nullable(),
+    pointsPrice: z.union([z.number(), z.string()]).optional().nullable(),
+    images: z.array(z.string()).optional().nullable(),
+    firstImage: z.string().optional().nullable(),
+  }).passthrough().optional().nullable(),
 }).passthrough();
 
 /** Delivery address on order (shape may vary); null for guest orders without address. */
@@ -48,6 +60,8 @@ export const OrderSchema = z.object({
   contactEmail: z.string().optional().nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
+  earnedPoints: z.number().default(0),
+  usedPoints: z.number().default(0),
   /** Registered user: { id, phoneNumber, name }; null for guest orders. */
   user: z
     .object({
