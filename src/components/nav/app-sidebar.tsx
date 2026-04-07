@@ -1,5 +1,5 @@
 import { Link } from '@tanstack/react-router';
-import { SquareTerminal, FolderTree, Package, ShoppingCart, Users, ArrowUpDown, Settings, BarChart3, Image, Star } from 'lucide-react';
+import { SquareTerminal, FolderTree, Package, ShoppingCart, Users, ArrowUpDown, Settings, BarChart3, Image, Star, PackageOpen } from 'lucide-react';
 
 import {
   Sidebar,
@@ -28,6 +28,11 @@ const data = {
           title: 'Захиалга',
           url: '/orders',
           icon: ShoppingCart,
+        },
+        {
+          title: 'Simple захиалга',
+          url: '/simple-orders',
+          icon: PackageOpen,
         },
         {
           title: 'Бүтээгдэхүүн',

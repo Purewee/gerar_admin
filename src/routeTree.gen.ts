@@ -17,6 +17,7 @@ import { Route as DashboardConstantsRouteRouteImport } from './routes/_dashboard
 import { Route as DashboardAboutRouteRouteImport } from './routes/_dashboard/about/route'
 import { Route as PublicLoginIndexRouteImport } from './routes/_public/login/index'
 import { Route as DashboardUsersIndexRouteImport } from './routes/_dashboard/users/index'
+import { Route as DashboardSimpleOrdersIndexRouteImport } from './routes/_dashboard/simple-orders/index'
 import { Route as DashboardProfileIndexRouteImport } from './routes/_dashboard/profile/index'
 import { Route as DashboardProductsIndexRouteImport } from './routes/_dashboard/products/index'
 import { Route as DashboardPostsIndexRouteImport } from './routes/_dashboard/posts/index'
@@ -28,6 +29,7 @@ import { Route as DashboardBannersIndexRouteImport } from './routes/_dashboard/b
 import { Route as DashboardAnalyticsIndexRouteImport } from './routes/_dashboard/analytics/index'
 import { Route as DashboardAboutIndexRouteImport } from './routes/_dashboard/about/index'
 import { Route as DashboardUsersIdRouteRouteImport } from './routes/_dashboard/users/$id/route'
+import { Route as DashboardSimpleOrdersIdRouteRouteImport } from './routes/_dashboard/simple-orders/$id/route'
 import { Route as DashboardProductsOrderRouteRouteImport } from './routes/_dashboard/products/order/route'
 import { Route as DashboardProductsNewRouteRouteImport } from './routes/_dashboard/products/new/route'
 import { Route as DashboardPostsPostIdRouteRouteImport } from './routes/_dashboard/posts/$postId/route'
@@ -81,6 +83,12 @@ const DashboardUsersIndexRoute = DashboardUsersIndexRouteImport.update({
   path: '/users/',
   getParentRoute: () => DashboardRouteRoute,
 } as any)
+const DashboardSimpleOrdersIndexRoute =
+  DashboardSimpleOrdersIndexRouteImport.update({
+    id: '/simple-orders/',
+    path: '/simple-orders/',
+    getParentRoute: () => DashboardRouteRoute,
+  } as any)
 const DashboardProfileIndexRoute = DashboardProfileIndexRouteImport.update({
   id: '/profile/',
   path: '/profile/',
@@ -138,6 +146,12 @@ const DashboardUsersIdRouteRoute = DashboardUsersIdRouteRouteImport.update({
   path: '/users/$id',
   getParentRoute: () => DashboardRouteRoute,
 } as any)
+const DashboardSimpleOrdersIdRouteRoute =
+  DashboardSimpleOrdersIdRouteRouteImport.update({
+    id: '/simple-orders/$id',
+    path: '/simple-orders/$id',
+    getParentRoute: () => DashboardRouteRoute,
+  } as any)
 const DashboardProductsOrderRouteRoute =
   DashboardProductsOrderRouteRouteImport.update({
     id: '/products/order',
@@ -235,6 +249,7 @@ export interface FileRoutesByFullPath {
   '/posts/$postId': typeof DashboardPostsPostIdRouteRouteWithChildren
   '/products/new': typeof DashboardProductsNewRouteRoute
   '/products/order': typeof DashboardProductsOrderRouteRoute
+  '/simple-orders/$id': typeof DashboardSimpleOrdersIdRouteRoute
   '/users/$id': typeof DashboardUsersIdRouteRoute
   '/about/': typeof DashboardAboutIndexRoute
   '/analytics': typeof DashboardAnalyticsIndexRoute
@@ -246,6 +261,7 @@ export interface FileRoutesByFullPath {
   '/posts/': typeof DashboardPostsIndexRoute
   '/products': typeof DashboardProductsIndexRoute
   '/profile': typeof DashboardProfileIndexRoute
+  '/simple-orders': typeof DashboardSimpleOrdersIndexRoute
   '/users': typeof DashboardUsersIndexRoute
   '/login': typeof PublicLoginIndexRoute
   '/banners/$id/edit': typeof DashboardBannersIdEditRouteRoute
@@ -265,6 +281,7 @@ export interface FileRoutesByTo {
   '/orders/$id': typeof DashboardOrdersIdRouteRoute
   '/products/new': typeof DashboardProductsNewRouteRoute
   '/products/order': typeof DashboardProductsOrderRouteRoute
+  '/simple-orders/$id': typeof DashboardSimpleOrdersIdRouteRoute
   '/users/$id': typeof DashboardUsersIdRouteRoute
   '/about': typeof DashboardAboutIndexRoute
   '/analytics': typeof DashboardAnalyticsIndexRoute
@@ -276,6 +293,7 @@ export interface FileRoutesByTo {
   '/posts': typeof DashboardPostsIndexRoute
   '/products': typeof DashboardProductsIndexRoute
   '/profile': typeof DashboardProfileIndexRoute
+  '/simple-orders': typeof DashboardSimpleOrdersIndexRoute
   '/users': typeof DashboardUsersIndexRoute
   '/login': typeof PublicLoginIndexRoute
   '/banners/$id/edit': typeof DashboardBannersIdEditRouteRoute
@@ -301,6 +319,7 @@ export interface FileRoutesById {
   '/_dashboard/posts/$postId': typeof DashboardPostsPostIdRouteRouteWithChildren
   '/_dashboard/products/new': typeof DashboardProductsNewRouteRoute
   '/_dashboard/products/order': typeof DashboardProductsOrderRouteRoute
+  '/_dashboard/simple-orders/$id': typeof DashboardSimpleOrdersIdRouteRoute
   '/_dashboard/users/$id': typeof DashboardUsersIdRouteRoute
   '/_dashboard/about/': typeof DashboardAboutIndexRoute
   '/_dashboard/analytics/': typeof DashboardAnalyticsIndexRoute
@@ -312,6 +331,7 @@ export interface FileRoutesById {
   '/_dashboard/posts/': typeof DashboardPostsIndexRoute
   '/_dashboard/products/': typeof DashboardProductsIndexRoute
   '/_dashboard/profile/': typeof DashboardProfileIndexRoute
+  '/_dashboard/simple-orders/': typeof DashboardSimpleOrdersIndexRoute
   '/_dashboard/users/': typeof DashboardUsersIndexRoute
   '/_public/login/': typeof PublicLoginIndexRoute
   '/_dashboard/banners/$id/edit': typeof DashboardBannersIdEditRouteRoute
@@ -336,6 +356,7 @@ export interface FileRouteTypes {
     | '/posts/$postId'
     | '/products/new'
     | '/products/order'
+    | '/simple-orders/$id'
     | '/users/$id'
     | '/about/'
     | '/analytics'
@@ -347,6 +368,7 @@ export interface FileRouteTypes {
     | '/posts/'
     | '/products'
     | '/profile'
+    | '/simple-orders'
     | '/users'
     | '/login'
     | '/banners/$id/edit'
@@ -366,6 +388,7 @@ export interface FileRouteTypes {
     | '/orders/$id'
     | '/products/new'
     | '/products/order'
+    | '/simple-orders/$id'
     | '/users/$id'
     | '/about'
     | '/analytics'
@@ -377,6 +400,7 @@ export interface FileRouteTypes {
     | '/posts'
     | '/products'
     | '/profile'
+    | '/simple-orders'
     | '/users'
     | '/login'
     | '/banners/$id/edit'
@@ -401,6 +425,7 @@ export interface FileRouteTypes {
     | '/_dashboard/posts/$postId'
     | '/_dashboard/products/new'
     | '/_dashboard/products/order'
+    | '/_dashboard/simple-orders/$id'
     | '/_dashboard/users/$id'
     | '/_dashboard/about/'
     | '/_dashboard/analytics/'
@@ -412,6 +437,7 @@ export interface FileRouteTypes {
     | '/_dashboard/posts/'
     | '/_dashboard/products/'
     | '/_dashboard/profile/'
+    | '/_dashboard/simple-orders/'
     | '/_dashboard/users/'
     | '/_public/login/'
     | '/_dashboard/banners/$id/edit'
@@ -483,6 +509,13 @@ declare module '@tanstack/react-router' {
       path: '/users'
       fullPath: '/users'
       preLoaderRoute: typeof DashboardUsersIndexRouteImport
+      parentRoute: typeof DashboardRouteRoute
+    }
+    '/_dashboard/simple-orders/': {
+      id: '/_dashboard/simple-orders/'
+      path: '/simple-orders'
+      fullPath: '/simple-orders'
+      preLoaderRoute: typeof DashboardSimpleOrdersIndexRouteImport
       parentRoute: typeof DashboardRouteRoute
     }
     '/_dashboard/profile/': {
@@ -560,6 +593,13 @@ declare module '@tanstack/react-router' {
       path: '/users/$id'
       fullPath: '/users/$id'
       preLoaderRoute: typeof DashboardUsersIdRouteRouteImport
+      parentRoute: typeof DashboardRouteRoute
+    }
+    '/_dashboard/simple-orders/$id': {
+      id: '/_dashboard/simple-orders/$id'
+      path: '/simple-orders/$id'
+      fullPath: '/simple-orders/$id'
+      preLoaderRoute: typeof DashboardSimpleOrdersIdRouteRouteImport
       parentRoute: typeof DashboardRouteRoute
     }
     '/_dashboard/products/order': {
@@ -713,6 +753,7 @@ interface DashboardRouteRouteChildren {
   DashboardOrdersIdRouteRoute: typeof DashboardOrdersIdRouteRoute
   DashboardProductsNewRouteRoute: typeof DashboardProductsNewRouteRoute
   DashboardProductsOrderRouteRoute: typeof DashboardProductsOrderRouteRoute
+  DashboardSimpleOrdersIdRouteRoute: typeof DashboardSimpleOrdersIdRouteRoute
   DashboardUsersIdRouteRoute: typeof DashboardUsersIdRouteRoute
   DashboardAnalyticsIndexRoute: typeof DashboardAnalyticsIndexRoute
   DashboardBannersIndexRoute: typeof DashboardBannersIndexRoute
@@ -722,6 +763,7 @@ interface DashboardRouteRouteChildren {
   DashboardPointProductsIndexRoute: typeof DashboardPointProductsIndexRoute
   DashboardProductsIndexRoute: typeof DashboardProductsIndexRoute
   DashboardProfileIndexRoute: typeof DashboardProfileIndexRoute
+  DashboardSimpleOrdersIndexRoute: typeof DashboardSimpleOrdersIndexRoute
   DashboardUsersIndexRoute: typeof DashboardUsersIndexRoute
   DashboardBannersIdEditRouteRoute: typeof DashboardBannersIdEditRouteRoute
   DashboardCategoriesIdEditRouteRoute: typeof DashboardCategoriesIdEditRouteRoute
@@ -742,6 +784,7 @@ const DashboardRouteRouteChildren: DashboardRouteRouteChildren = {
   DashboardOrdersIdRouteRoute: DashboardOrdersIdRouteRoute,
   DashboardProductsNewRouteRoute: DashboardProductsNewRouteRoute,
   DashboardProductsOrderRouteRoute: DashboardProductsOrderRouteRoute,
+  DashboardSimpleOrdersIdRouteRoute: DashboardSimpleOrdersIdRouteRoute,
   DashboardUsersIdRouteRoute: DashboardUsersIdRouteRoute,
   DashboardAnalyticsIndexRoute: DashboardAnalyticsIndexRoute,
   DashboardBannersIndexRoute: DashboardBannersIndexRoute,
@@ -751,6 +794,7 @@ const DashboardRouteRouteChildren: DashboardRouteRouteChildren = {
   DashboardPointProductsIndexRoute: DashboardPointProductsIndexRoute,
   DashboardProductsIndexRoute: DashboardProductsIndexRoute,
   DashboardProfileIndexRoute: DashboardProfileIndexRoute,
+  DashboardSimpleOrdersIndexRoute: DashboardSimpleOrdersIndexRoute,
   DashboardUsersIndexRoute: DashboardUsersIndexRoute,
   DashboardBannersIdEditRouteRoute: DashboardBannersIdEditRouteRoute,
   DashboardCategoriesIdEditRouteRoute: DashboardCategoriesIdEditRouteRoute,
