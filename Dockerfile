@@ -6,8 +6,8 @@ FROM node:22-alpine AS builder
 # Set working directory
 WORKDIR /app
 
-# Copy package files AND lockfile
-COPY package*.json pnpm-lock.yaml ./
+# Copy package files, workspace config, and lockfile
+COPY package*.json pnpm-lock.yaml pnpm-workspace.yaml ./
 
 # Install pnpm globally
 RUN npm install -g pnpm
